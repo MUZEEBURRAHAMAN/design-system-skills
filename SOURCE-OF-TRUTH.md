@@ -72,3 +72,12 @@ Every skill file in `skills/` links back to this document in its own words where
 
 - Figma node IDs are not used as the primary key anywhere in this toolkit's JSON files, because they're documented as unstable (see `STALE_ID` detection in `ds-sync.md` and `ds-audit-figma.md` — a node ID goes stale the moment a component is recreated in Figma). Component **names** remain the stable identity; this is a Figma-first policy, not a raw-node-ID-first one.
 - This repository ships no live Figma file or Storybook. `npm run check` proves the registry/presence logic (against fixtures), the snapshot-freshness checker, and that the written rules (including every rule in this file) are present and enforced in the skill text. It cannot prove that Claude follows those instructions at runtime, or exercise `figma_execute`/Storybook calls — that only happens once the skills are installed in a real project. Snapshot freshness is enforced only where a job runs `check-snapshot.mjs`; and only against live Figma where a job supplies `--figma-modified`/`--figma-version`.
+
+## Validation Status at Merge (2026-09-26)
+
+Exercised against a real Figma file (AI UI Kit) and Storybook, read-only, with the assistant following each skill's procedure; the file was verified unchanged before and after. Not everything is fully verified:
+
+- **Live snapshot freshness: not verified.** `check-snapshot.mjs --live` never completed a successful live check (the Figma REST token had expired). Consistency, recency, provenance and the failure paths (no token, bad token, code-fallback `DESIGN.md`) were exercised; freshness against live Figma still needs one run with a valid `FIGMA_ACCESS_TOKEN`.
+- **`/ds-lifecycle`: partially validated.** The Figma-only / partOf / no-promotion rules are written and tested as text; the lifecycle file seeding and promote/deprecate flows were not run end to end in an installed session.
+- **`/ds-proto`: partially validated.** Component discovery, Figma-derived composition and rendering were exercised; the discovery interview, concept generation and self-critique phases were not.
+- **Project-specific mapping and discovery.** The mapping file was built by a discovery script tied to that file's page structure (it missed a component whose section is not named `<Name>_Components`); the registry does not extract variants or tokens from plain-CSS components; Figma-to-code identity by name needs the mapping's `sourceFile` when names differ.
