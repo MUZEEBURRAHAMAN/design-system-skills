@@ -65,20 +65,22 @@ const page = figma.currentPage;
 const sections = page.children.filter(c => c.type === 'FRAME' || c.type === 'SECTION');
 const inventory = {};
 for (const section of sections) {
-  const content = section.findChild(c => c.name === 'content');
-  if (!content || !('children' in content)) continue;
-  inventory[section.name] = content.children
-    .filter(c => ['COMPONENT', 'COMPONENT_SET', 'FRAME'].includes(c.type))
-    .map(c => ({
-      name: c.name,
-      type: c.type,
-      id: c.id,
-      variantCount: c.type === 'COMPONENT_SET' && 'children' in c ? c.children.length : (c.type === 'COMPONENT' ? 1 : 0),
-      hasDescription: !!c.description
-    }));
+  // Any component set, or standalone component, anywhere inside the section — no assumption
+  // about how the file nests them (a `content` frame, a wrapper frame, sections per component, ...).
+  const found = section.findAll(n => n.type === 'COMPONENT_SET' || (n.type === 'COMPONENT' && n.parent && n.parent.type !== 'COMPONENT_SET'));
+  if (found.length === 0) continue;
+  inventory[section.name] = found.map(c => ({
+    name: c.name,
+    type: c.type,
+    id: c.id,
+    variantCount: c.type === 'COMPONENT_SET' ? c.children.length : 1,
+    hasDescription: !!c.description
+  }));
 }
 return inventory;
 ```
+
+**Guard: an empty inventory is a failure of the read, not a finding.** If the result is `{}` (or far smaller than the mapping file's component count), stop and say the Figma read returned nothing — never continue and report every component as CODE ONLY. Figma node names are often not the component's name (a component set called `button`, or `Default` inside a wrapper): take the component's name from the mapping file / section (`<Name>_Components`), not from the node name.
 
 ### 1.2 Code Inventory (DS Barrel)
 
