@@ -103,7 +103,8 @@ Build a flat Figma variable map keyed by name:
 
 Match CSS tokens to Figma variables by normalising names:
 - Strip `--` prefix from CSS variable names
-- Normalise separators (`-`, `_`) to the same form
+- Normalise separators (`-`, `_`, and Figma's group separator `/`) to the same form (Figma names like `color/text/primary` match `--color-text-primary`)
+- Light/dark: some files keep dark values in a **second collection** (e.g. `02 — COLOR / SEMANTIC` and `02 — COLOR / SEMANTIC — DARK`) rather than a second mode. Pair them by name (same variable name, collection name ending in `DARK`); the dark value is the paired variable's resolved value, else the light value
 - Case-insensitive comparison
 
 For each CSS token, attempt to find a Figma variable with a matching name.

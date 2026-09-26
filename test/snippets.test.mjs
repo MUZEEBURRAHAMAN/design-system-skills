@@ -50,3 +50,39 @@ test("the skill tells Claude an empty Figma read is a failure, not a finding", (
   assert.match(md, /empty inventory is a failure of the read/i);
   assert.match(md, /never continue and report every component as CODE ONLY/i);
 });
+
+// Regression: ds-audit-figma Phase 5 hard-coded a collection named "Semantic"; the real file has
+// "02 — COLOR / SEMANTIC" (+ "— DARK" as a separate collection), so the audit saw zero variables.
+const auditMd = readFileSync(join(REPO, "skills/ds-audit-figma.md"), "utf8");
+const phase5 = auditMd.slice(auditMd.indexOf("## Phase 5")).match(/```js\n([\s\S]*?)```/)[1].replace(/^\/\/ figma_execute\n/, "");
+const tokensMd = readFileSync(join(REPO, "skills/ds-tokens.md"), "utf8");
+
+test("ds-audit-figma Phase 5 finds semantic variables in real-style collection names incl. a separate DARK collection", async () => {
+  const cols = [
+    { id: "c1", name: "01 — COLOR / PRIMITIVES" },
+    { id: "c2", name: "02 — COLOR / SEMANTIC" },
+    { id: "c3", name: "02 — COLOR / SEMANTIC — DARK" },
+  ];
+  const vars = [
+    { id: "v1", name: "color/text/primary", variableCollectionId: "c2", valuesByMode: { m: "#181920" } },
+    { id: "v2", name: "color/text/primary", variableCollectionId: "c3", valuesByMode: { m: "#f9f9fb" } },
+    { id: "v3", name: "color/brand/600", variableCollectionId: "c1", valuesByMode: { m: "#2745e8" } },
+  ];
+  const figma = { variables: { getLocalVariableCollectionsAsync: async () => cols, getLocalVariablesAsync: async () => vars } };
+  const out = await vm.runInNewContext(`(async function(){ ${phase5} })()`, { figma });
+  assert.deepEqual(out.map((v) => v.id), ["v1", "v2"]);
+  assert.equal(out.find((v) => v.id === "v2").isDarkCollection, true);
+  assert.doesNotMatch(phase5, /=== 'Semantic'/);
+});
+
+test("ds-audit-figma Phase 5 returns an explicit error, not an empty list, when nothing matches", async () => {
+  const figma = { variables: { getLocalVariableCollectionsAsync: async () => [{ id: "x", name: "Brand" }], getLocalVariablesAsync: async () => [] } };
+  const out = await vm.runInNewContext(`(async function(){ ${phase5} })()`, { figma });
+  assert.match(out.error, /no semantic collection/);
+});
+
+test("ds-tokens normalises Figma '/' names and pairs a separate DARK collection", () => {
+  assert.match(tokensMd, /group separator `\/`/);
+  assert.match(tokensMd, /second collection/);
+  assert.match(tokensMd, /ending in `DARK`/);
+});

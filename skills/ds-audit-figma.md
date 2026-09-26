@@ -263,21 +263,25 @@ Use `figma_get_variables` to check all semantic colour tokens have both Light an
 
 ```js
 // figma_execute
-const collections = figma.variables.getLocalVariableCollections();
-const semanticCollection = collections.find(c => c.name === 'Semantic');
-const variables = semanticCollection
-  ? figma.variables.getLocalVariables().filter(v => v.variableCollectionId === semanticCollection.id)
-  : [];
-return variables.map(v => ({
-  name: v.name,
-  id: v.id,
-  modes: Object.entries(v.valuesByMode).map(([modeId, val]) => ({ modeId, value: val }))
-}));
+// Do not assume a collection literally named "Semantic": match by name pattern (e.g. "02 — COLOR / SEMANTIC",
+// "03 — COLOR / AI"). A dark theme may be a separate collection whose name ends in DARK instead of a second mode.
+const collections = await figma.variables.getLocalVariableCollectionsAsync();
+const semanticCollections = collections.filter(c => /semantic|COLOR \/ AI/i.test(c.name));
+if (semanticCollections.length === 0) return { error: 'no semantic collection found', collections: collections.map(c => c.name) };
+const all = await figma.variables.getLocalVariablesAsync();
+const ids = new Set(semanticCollections.map(c => c.id));
+return all.filter(v => ids.has(v.variableCollectionId)).map(v => {
+  const col = semanticCollections.find(c => c.id === v.variableCollectionId);
+  return {
+    name: v.name, id: v.id, collection: col.name, isDarkCollection: /DARK$/.test(col.name),
+    modes: Object.entries(v.valuesByMode).map(([modeId, val]) => ({ modeId, value: val }))
+  };
+});
 ```
 
 Report:
 - Total variables with Light+Dark values
-- Variables missing a mode value
+- Variables missing a mode value (for a separate `... DARK` collection: a light variable with no same-named dark variable)
 - Variables with identical Light and Dark values (possible oversight)
 
 ---
