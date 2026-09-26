@@ -4,7 +4,7 @@ description: Audit Storybook + Figma DS for component drift, producing a full pa
 
 # Design System Parity Report
 
-Run a read-only audit across all three pillars of the design system — **Code (barrel exports)**, **Storybook (stories)**, and **Figma (components/variables)** — then produce a single markdown report with totals, a full cross-reference matrix, and an outliers table.
+Run a read-only audit across all three pillars of the design system — **Figma (components/variables)**, **Code (barrel exports)**, and **Storybook (stories)** — then produce a single markdown report with totals, a full cross-reference matrix, and an outliers table. Figma is the reference; every discrepancy is reported as implementation drift, never as Figma being out of date — see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md).
 
 ## Prerequisites
 
@@ -51,44 +51,13 @@ Gather data from all three sources in parallel. Do NOT modify anything — this 
 
 ### 1.0 Load the DS Registry (Fast Path)
 
-If `.claude/ds-registry.json` exists, load it as the primary data source (single file read). The registry provides the complete Code inventory (component names, source files, variants, props), Storybook inventory (story files, story names, argTypes), Figma mappings (node IDs, types, variant counts), token cross-references, icon inventory, and section groupings. This replaces most of the individual file reads in Phases 1.1–1.5. You still need a live Figma API call (Phase 1.3) for fresh Figma node counts.
+If `.claude/ds-registry.json` exists, load it as the primary data source (single file read). The registry provides the complete Figma mappings (node IDs, types, variant counts — including anything not yet built, via `presence.inCode: false`), Code inventory (component names, source files, variants, props), Storybook inventory (story files, story names, argTypes), token cross-references, icon inventory, and section groupings. This replaces most of the individual file reads in Phases 1.1–1.5. You still need a live Figma API call (Phase 1.1) for fresh Figma node counts.
 
 If the registry does not exist, fall back to the individual file reads described below.
 
-### 1.1 Code Inventory (DS Barrel)
+### 1.1 Figma Inventory (the anchor list)
 
-Read your component library's barrel export file (e.g., `src/index.ts` or `src/main.tsx`) and extract every exported component. Normalise each path to a component name:
-
-```
-./components/button/button       → Button
-./components/forms/search-field  → SearchField
-./components/cards/metric-card   → MetricCard
-```
-
-Also count:
-- **Total component exports** (unique component modules, excluding hooks/utils/icons)
-- **Icon helpers** (if applicable)
-- **Hooks** (if applicable)
-
-### 1.2 Storybook Inventory
-
-Glob all story files:
-
-```
-src/stories/*.stories.tsx
-packages/*/stories/*.stories.tsx
-```
-
-For each story file, extract:
-- **File name** → component name (e.g., `button.stories.tsx` → `Button`)
-- **Number of named exports** (each `export const Foo: Story` = one story variant)
-- **Storybook section** from the `title` field in `meta`
-
-Build a map: `{ componentName → { section, variantCount, filePath } }`
-
-### 1.3 Figma Inventory
-
-First read `.claude/ds-story-figma-map.json` for pre-built component↔Figma ID lookups. Then use `figma_execute` to enumerate all sections and their component children on the Design System page for a fresh count:
+First read `.claude/ds-story-figma-map.json` for pre-built component↔Figma ID lookups. Then use `figma_execute` to enumerate all sections and their component children on the Design System page for a fresh count — this is the base list every other source gets matched against:
 
 ```js
 const page = figma.currentPage;
@@ -109,6 +78,37 @@ for (const section of sections) {
 }
 return inventory;
 ```
+
+### 1.2 Code Inventory (DS Barrel)
+
+Read your component library's barrel export file (e.g., `src/index.ts` or `src/main.tsx`) and extract every exported component. Normalise each path to a component name:
+
+```
+./components/button/button       → Button
+./components/forms/search-field  → SearchField
+./components/cards/metric-card   → MetricCard
+```
+
+Also count:
+- **Total component exports** (unique component modules, excluding hooks/utils/icons)
+- **Icon helpers** (if applicable)
+- **Hooks** (if applicable)
+
+### 1.3 Storybook Inventory
+
+Glob all story files:
+
+```
+src/stories/*.stories.tsx
+packages/*/stories/*.stories.tsx
+```
+
+For each story file, extract:
+- **File name** → component name (e.g., `button.stories.tsx` → `Button`)
+- **Number of named exports** (each `export const Foo: Story` = one story variant)
+- **Storybook section** from the `title` field in `meta`
+
+Build a map: `{ componentName → { section, variantCount, filePath } }`
 
 ### 1.4 Variable / Token Inventory
 
@@ -151,8 +151,8 @@ Create a unified matrix with one row per component. Columns:
 **Status rules:**
 - **FULL PARITY** — present in all three (code, story, Figma)
 - **PARTIAL** — present in two of three
-- **CODE ONLY** — exported from DS barrel but no story AND no Figma component
-- **FIGMA ONLY** — exists in Figma but not exported from code
+- **CODE ONLY** — exported from DS barrel but no story AND no Figma component. Worth a second look under a Figma-first policy: was this ever designed?
+- **FIGMA ONLY** — exists in Figma but not exported from code. A real, actionable gap — not a footnote — corresponds to `presence.inCode: false` in the registry (see `guides/ds-registry.md`)
 - **STORY ONLY** — has a story file but not exported from DS barrel
 
 ### 2.2 Variant Count Comparison
@@ -223,7 +223,7 @@ After generating the report, save the current snapshot to `.claude/ds-benchmarks
 
 - **Read-only** — this skill NEVER modifies code or Figma. It only reads and reports.
 - **Be exhaustive** — every component, story, variable, and icon must appear in the matrix.
-- **Normalise names** — `metric-card.stories.tsx` → `MetricCard`, Figma `MetricCard` → `MetricCard`. Use PascalCase for comparison.
+- **Figma's name is canonical** — normalise the code/story name to match Figma's component name, not the reverse. `metric-card.stories.tsx` → `MetricCard` is only correct because Figma's component is also named `MetricCard`; if they differ, the mismatch itself is worth flagging, and the code/story side is what should be renamed to match Figma.
 - **Count accurately** — open story files and count `export const` statements for variant counts.
 - **Flag aggressively** — any discrepancy between the three sources is an outlier.
 - **Always benchmark** — every run MUST persist a snapshot.

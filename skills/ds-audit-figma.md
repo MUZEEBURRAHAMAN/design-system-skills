@@ -4,7 +4,7 @@ description: Figma-to-Storybook visual parity audit (read-only spot-check)
 
 # Figma–Storybook Parity Audit
 
-Run a comprehensive audit comparing the Figma Design System file against the Storybook component library. For each component, capture screenshots in both systems, extract computed visual properties, diff them per-variant, and produce a structured report with drift scores and prioritised action items.
+Run a comprehensive audit comparing the Figma Design System file against the Storybook component library. For each component, capture screenshots in both systems, extract computed visual properties, diff them per-variant, and produce a structured report with drift scores and prioritised action items. Figma is the reference — see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) — so every finding here is "the implementation drifted," and every action item points at fixing code (via `/ds-sync`), never at fixing Figma.
 
 ## Prerequisites
 
@@ -355,7 +355,8 @@ Write a markdown parity report:
 
 ## Guidelines
 
-- **Read-only** — this skill never modifies code or Figma
+- **Read-only** — this skill never modifies code or Figma, under any flag (Guardrail 1, SOURCE-OF-TRUTH.md)
+- **Figma is the reference** — every DRIFT/MISMATCH is implementation drift, never "Figma is out of date"
 - **Visual-first** — use screenshots for comparison, not just metadata
 - **Token-aware** — check that Figma components use variable bindings, not hardcoded values
 - **Both themes** — use `--themes` to explicitly check light + dark; always report when only one was checked
