@@ -1,9 +1,19 @@
 /**
- * Design System Registry Generator
+ * Design System Registry Generator (Figma-first)
  *
- * Reads source files (barrel exports, CVA variants, story metadata, Figma map,
- * token map) and produces a single `.claude/ds-registry.json` — the unified
- * source of truth for AI tooling.
+ * Enumerates components from the Figma mapping file FIRST — every component
+ * that exists in a Figma section gets a registry entry even if no code
+ * implementation exists yet (`presence.inCode: false`). Code (barrel exports,
+ * CVA variants, story metadata) is then read and merged in as a second pass.
+ * Figma is the source of truth for what the design system's component set
+ * *is*; code is what has been *built* of it so far. See ../SOURCE-OF-TRUTH.md.
+ *
+ * This script has no live Figma access of its own (it only reads whatever is
+ * already in `.claude/ds-story-figma-map.json` / `.claude/ds-token-map.json`).
+ * Populating those files with real Figma variant/property/token data is the
+ * job of the interactive skills (ds-sync, ds-tokens, ds-spec), which do have
+ * `figma_execute` access. This script's job is just to merge what's already
+ * there — never to guess or invent Figma-side data.
  *
  * Run:       pnpm ds:registry
  * Auto-sync: called by Storybook's `prestorybook` hook
@@ -13,6 +23,7 @@
  * Search for "CUSTOMISE:" to find all configurable sections.
  */
 
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,15 +33,10 @@ const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, "..");
 
 // ---------------------------------------------------------------------------
-// CUSTOMISE: Source directories
+// CUSTOMISE: Configuration
 // ---------------------------------------------------------------------------
 
-/**
- * CUSTOMISE: Path(s) to your component library source directories.
- * Each entry should point to a directory containing a barrel export file
- * (e.g., main.tsx or index.ts) and component source files.
- */
-const PACKAGE_SOURCES: Array<{
+export interface PackageSource {
   /** Absolute path to the package's src directory */
   srcDir: string;
   /** Name of the barrel export file (e.g., "main.tsx", "index.ts") */
@@ -39,50 +45,56 @@ const PACKAGE_SOURCES: Array<{
   packageName: string;
   /** Priority: higher-priority packages win when both export the same name */
   priority: number;
-}> = [
-  {
-    srcDir: join(ROOT, "packages/ds/src"),
-    barrelFile: "main.tsx",
-    packageName: "@acme/ds",
-    priority: 1,
-  },
-  // CUSTOMISE: Add more packages if your DS spans multiple packages:
-  // {
-  //   srcDir: join(ROOT, "packages/form/src"),
-  //   barrelFile: "main.tsx",
-  //   packageName: "@acme/form",
-  //   priority: 0,
-  // },
-];
+}
+
+export interface RegistryConfig {
+  root: string;
+  packageSources: PackageSource[];
+  storiesDirs: string[];
+  figmaMapPath: string;
+  tokenMapPath: string;
+  manifestPath: string;
+  outputPath: string;
+  /** Injectable clock so tests are deterministic. */
+  now?: () => Date;
+}
 
 /**
- * CUSTOMISE: Directories containing Storybook story files.
- * The script globs for *.stories.tsx in each directory.
+ * CUSTOMISE: the defaults below match a `packages/ds` monorepo layout.
+ * Tests build their own RegistryConfig pointing at fixture directories.
  */
-const STORIES_DIRS: string[] = [
-  join(ROOT, "packages/ds/stories"),
-  // CUSTOMISE: Add more story directories:
-  // join(ROOT, "packages/form/stories"),
-  // join(ROOT, "apps/platform/stories"),
-];
-
-/**
- * CUSTOMISE: Paths to optional data files.
- * These are merged into the registry if they exist. If missing, the
- * corresponding sections are omitted.
- */
-const FIGMA_MAP_PATH = join(ROOT, ".claude/ds-story-figma-map.json");
-const TOKEN_MAP_PATH = join(ROOT, ".claude/ds-token-map.json");
-const MANIFEST_PATH = join(ROOT, "design-system-manifest.json");
-
-/**
- * CUSTOMISE: Output path for the generated registry.
- */
-const OUTPUT_PATH = join(ROOT, ".claude/ds-registry.json");
+export function defaultConfig(root: string = ROOT): RegistryConfig {
+  return {
+    root,
+    // CUSTOMISE: component library source directories (each needs a barrel export).
+    packageSources: [
+      {
+        srcDir: join(root, "packages/ds/src"),
+        barrelFile: "main.tsx",
+        packageName: "@acme/ds",
+        priority: 1,
+      },
+      // CUSTOMISE: add more packages if your DS spans several:
+      // { srcDir: join(root, "packages/form/src"), barrelFile: "main.tsx", packageName: "@acme/form", priority: 0 },
+    ],
+    // CUSTOMISE: directories containing *.stories.tsx files.
+    storiesDirs: [join(root, "packages/ds/stories")],
+    // The Figma mapping file is the base component list (Figma-first).
+    figmaMapPath: join(root, ".claude/ds-story-figma-map.json"),
+    tokenMapPath: join(root, ".claude/ds-token-map.json"),
+    manifestPath: join(root, "design-system-manifest.json"),
+    outputPath: join(root, ".claude/ds-registry.json"),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function sha256(path: string): string | undefined {
+  if (!existsSync(path)) return undefined;
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
 
 function readJson<T>(path: string): T | null {
   if (!existsSync(path)) return null;
@@ -319,10 +331,15 @@ interface FigmaMap {
     semanticCollection: string;
     lightMode: string;
     darkMode: string;
+    /** Figma file version/last-modified at the time the mapping was refreshed from live Figma. Used by check-snapshot.mjs. */
+    figmaVersion?: string;
+    figmaModifiedAt?: string;
   };
   sections: Record<string, FigmaSection>;
-  storybookOnly: Record<string, string[]>;
-  figmaOnly: Record<string, string>;
+  /** Code exports with no visual Figma counterpart by design (hooks, utilities) — a permanent, documented exception, not a gap to fill. */
+  storybookOnly: Record<string, { reason: string }>;
+  /** Figma nodes with no code counterpart by design (documentation frames, color swatches) — a permanent, documented exception. A real component pending implementation belongs in `sections[x].components`, not here — see `presence.inCode` on the registry entry it produces. */
+  figmaOnly: Record<string, { figmaId?: string; reason: string }>;
   keyVariableIds: Record<string, string>;
 }
 
@@ -349,17 +366,29 @@ interface TokenMap {
 
 interface RegistryComponent {
   name: string;
-  package: string;
-  sourceFile: string;
   section: string;
+  /**
+   * Whether this component actually exists on each side. `inFigma: true,
+   * inCode: false` is a real component proposed in Figma with no
+   * implementation yet — a first-class entry, not a footnote. See Guardrail 6
+   * in ../SOURCE-OF-TRUTH.md.
+   */
+  presence: { inFigma: boolean; inCode: boolean };
+  package?: string;
+  sourceFile?: string;
+  /** Set on a code-only export that lives in the source file of a Figma-known component (a compound part). */
+  partOf?: string;
+  /** "mapped": presence comes from the mapping file's sourceFile, not from an export with the same name */
+  codeIdentity?: "mapped";
   variants?: Record<string, string[]>;
   defaultVariants?: Record<string, string>;
   props?: Record<string, string>;
   tokens?: string[];
   radixPrimitives?: string[];
+  /** Storybook story IDs — from the mapping file when `presence.inCode` is false (a designer may have pre-listed intended story names), from the parsed story file otherwise. */
   stories?: {
-    file: string;
-    path: string;
+    file?: string;
+    path?: string;
     variants: string[];
     argTypes?: Record<string, { options?: string[] }>;
   };
@@ -377,6 +406,18 @@ interface Registry {
     generatedAt: string;
     generatedBy: string;
     figmaFile?: string;
+    /**
+     * Provenance of the Figma-derived data this registry was built from.
+     * `scripts/check-snapshot.mjs` uses it to prove the snapshot is fresh.
+     */
+    snapshot?: {
+      source: "figma-mapping";
+      figmaFile?: string;
+      figmaVersion?: string;
+      figmaModifiedAt?: string;
+      figmaMapSha256: string;
+      tokenMapSha256?: string;
+    };
     tokenStats?: {
       primitives: number;
       semantic: number;
@@ -403,9 +444,15 @@ interface Registry {
     remix: string[];
   };
   sections: string[];
+  /**
+   * Permanent, documented exceptions only (a hook with no visual form, a
+   * documentation-only Figma frame) — NOT where a real not-yet-built
+   * component lives. Those are first-class entries in `components` with
+   * `presence.inCode: false`. See SOURCE-OF-TRUTH.md Guardrail 6.
+   */
   outliers?: {
-    storybookOnly: Record<string, string[]>;
-    figmaOnly: Record<string, string>;
+    storybookOnly: Record<string, { reason: string }>;
+    figmaOnly: Record<string, { figmaId?: string; reason: string }>;
   };
 }
 
@@ -413,13 +460,23 @@ interface Registry {
 // 1. Parse barrel exports -> component source paths
 // ---------------------------------------------------------------------------
 
+/**
+ * Follow a barrel export to the files that actually define components.
+ * Handles `export * from "./X"` and named re-exports (`export { A, B } from "./X"`),
+ * and keeps following them through directory index files (`./Button` ->
+ * `Button/index.ts` -> `Button/Button.tsx`) — the common "one folder per
+ * component, each with an index.ts" layout. `export type { ... } from` is
+ * ignored (types aren't components).
+ */
 function parseBarrelExports(
   mainPath: string,
+  seen: Set<string> = new Set(),
 ): Array<{ exportPath: string; resolvedPath: string }> {
-  if (!existsSync(mainPath)) return [];
+  if (!existsSync(mainPath) || seen.has(mainPath)) return [];
+  seen.add(mainPath);
   const source = readFileSync(mainPath, "utf-8");
   const results: Array<{ exportPath: string; resolvedPath: string }> = [];
-  const re = /export\s+\*\s+from\s+["']([^"']+)["']/g;
+  const re = /export\s+(?:\*|\{[^}]*\})\s+from\s+["']([^"']+)["']/g;
   let m = re.exec(source);
   while (m) {
     const relPath = m[1];
@@ -428,7 +485,13 @@ function parseBarrelExports(
     for (const ext of [".tsx", ".ts", "/index.tsx", "/index.ts"]) {
       const full = resolve(base, `${relPath}${ext}`);
       if (existsSync(full)) {
-        results.push({ exportPath: relPath, resolvedPath: full });
+        if (!results.some((r) => r.resolvedPath === full)) {
+          results.push({ exportPath: relPath, resolvedPath: full });
+        }
+        // The target may itself be a barrel: follow its re-exports too.
+        for (const inner of parseBarrelExports(full, seen)) {
+          if (!results.some((r) => r.resolvedPath === inner.resolvedPath)) results.push(inner);
+        }
         break;
       }
     }
@@ -441,9 +504,9 @@ function parseBarrelExports(
 // 2. Parse story files
 // ---------------------------------------------------------------------------
 
-function parseStoryFiles(): StoryMeta[] {
+function parseStoryFiles(config: RegistryConfig): StoryMeta[] {
   const stories: StoryMeta[] = [];
-  for (const dir of STORIES_DIRS) {
+  for (const dir of config.storiesDirs) {
     if (!existsSync(dir)) continue;
     const files = readdirSync(dir).filter((f) => f.endsWith(".stories.tsx"));
     for (const file of files) {
@@ -498,7 +561,7 @@ function parseStoryFiles(): StoryMeta[] {
         }
       }
 
-      const relPath = fullPath.replace(`${ROOT}/`, "");
+      const relPath = fullPath.replace(`${config.root}/`, "");
       stories.push({
         file: relPath,
         title,
@@ -516,13 +579,13 @@ function parseStoryFiles(): StoryMeta[] {
 // 3. Build registry
 // ---------------------------------------------------------------------------
 
-function buildRegistry(): Registry {
+export function buildRegistry(config: RegistryConfig = defaultConfig()): Registry {
   // Load optional data files
-  const figmaMap = readJson<FigmaMap>(FIGMA_MAP_PATH);
-  const tokenMap = readJson<TokenMap>(TOKEN_MAP_PATH);
+  const figmaMap = readJson<FigmaMap>(config.figmaMapPath);
+  const tokenMap = readJson<TokenMap>(config.tokenMapPath);
 
   // Parse barrel exports from all configured packages (sorted by priority, highest first)
-  const sortedPackages = [...PACKAGE_SOURCES].sort(
+  const sortedPackages = [...config.packageSources].sort(
     (a, b) => b.priority - a.priority,
   );
   const allExports: Array<{
@@ -543,7 +606,7 @@ function buildRegistry(): Registry {
   }
 
   // Parse story files
-  const storyMetas = parseStoryFiles();
+  const storyMetas = parseStoryFiles(config);
 
   // Build lookups: component name -> story meta
   const storyByComponent = new Map<string, StoryMeta>();
@@ -570,13 +633,51 @@ function buildRegistry(): Registry {
     }
   }
 
-  // Build components registry from barrel exports
   const components: Record<string, RegistryComponent> = {};
   const allSections = new Set<string>();
 
+  // ---------------------------------------------------------------------
+  // PASS 1 — seed from Figma. Every component Figma already knows about
+  // gets a registry entry now, whether or not code exists for it yet.
+  // This is the Figma-first fix: previously, a component sitting in
+  // figmaMap.sections[x].components with no matching barrel export was
+  // silently invisible in the registry. Now it's a real entry with
+  // `presence: { inFigma: true, inCode: false }`.
+  // ---------------------------------------------------------------------
+  for (const [name, figma] of figmaByComponent) {
+    allSections.add(figma.section);
+    const entry: RegistryComponent = {
+      name,
+      section: figma.section,
+      presence: { inFigma: true, inCode: false },
+      figma: {
+        nodeId: figma.entry.figmaId,
+        type: figma.entry.figmaType,
+      },
+    };
+    if (figma.entry.variantCount)
+      entry.figma!.variantCount = figma.entry.variantCount;
+    entry.figma!.sectionFrameId = figma.sectionFrameId;
+    // The mapping file may list intended story IDs before any code exists
+    // (a designer or PM pre-naming the stories a future implementation
+    // should produce). Surface them so the gap is actionable, not just known.
+    if (figma.entry.stories && figma.entry.stories.length > 0) {
+      entry.stories = { variants: figma.entry.stories };
+    }
+    components[name] = entry;
+  }
+
+  // ---------------------------------------------------------------------
+  // PASS 2 — merge in code. Fills in implementation details for entries
+  // Pass 1 already created, and adds any code-only component Figma has no
+  // section entry for yet (presence.inFigma: false — a real, separate
+  // signal worth surfacing: this was built without a Figma source).
+  // ---------------------------------------------------------------------
+  const codeClaimedNames = new Set<string>();
+
   for (const { resolvedPath, packageName, priority } of allExports) {
     const source = readFileSync(resolvedPath, "utf-8");
-    const relPath = resolvedPath.replace(`${ROOT}/`, "");
+    const relPath = resolvedPath.replace(`${config.root}/`, "");
 
     // Find exported component names (forwardRef pattern or plain export)
     const exportedNames: string[] = [];
@@ -604,6 +705,19 @@ function buildRegistry(): Registry {
       fnm = fnRe.exec(source);
     }
 
+    // Aliased re-exports declared in the component file itself, e.g.
+    // `export { Drawer as Sheet, DrawerClose as SheetClose } from '../Drawer'` — the alias is the public name.
+    const aliasRe = /export\s*\{([^}]*)\}\s*from\s*["'][^"']+["']/g;
+    let am = aliasRe.exec(source);
+    while (am) {
+      for (const part of am[1].split(",")) {
+        if (!/\sas\s/.test(part)) continue; // plain re-exports are barrel plumbing, not declarations
+        const alias = part.trim().split(/\s+as\s+/).pop()!.trim();
+        if (/^[A-Z]\w*$/.test(alias) && !alias.endsWith("Props") && !alias.endsWith("Variants") && !exportedNames.includes(alias)) exportedNames.push(alias);
+      }
+      am = aliasRe.exec(source);
+    }
+
     if (exportedNames.length === 0) continue;
 
     const cvaVariants = extractCvaVariants(source);
@@ -615,29 +729,37 @@ function buildRegistry(): Registry {
     for (const name of exportedNames) {
       // CUSTOMISE: Skip patterns for your project. These skip icon components
       // and Remix Icon re-exports by default. Adjust or remove as needed.
-      if (name.endsWith("Icon") && !name.includes("Button")) continue;
+      if (name !== "Icon" && name.endsWith("Icon") && !name.includes("Button")) continue;
       if (name.startsWith("Ri")) continue;
 
-      // Higher-priority packages win: skip if already registered by a higher-priority package
-      if (components[name]) continue;
+      // Higher-priority packages win: skip if a higher-priority package
+      // already claimed this name (independent of the Figma seed pass).
+      if (codeClaimedNames.has(name)) continue;
+      codeClaimedNames.add(name);
 
       // Find matching story
       const storyMeta =
         storyByComponent.get(name) ||
         storyByComponent.get(name.replace(/([A-Z])/g, " $1").trim());
 
-      // Find matching Figma entry
       const figma = figmaByComponent.get(name);
+      const existing = components[name]; // set in Pass 1 if Figma knows this component
 
-      const section = figma?.section || storyMeta?.section || "Uncategorized";
+      const section =
+        existing?.section ||
+        figma?.section ||
+        storyMeta?.section ||
+        "Uncategorized";
       allSections.add(section);
 
-      const entry: RegistryComponent = {
+      const entry: RegistryComponent = existing ?? {
         name,
-        package: packageName,
-        sourceFile: relPath,
         section,
+        presence: { inFigma: false, inCode: false },
       };
+      entry.presence.inCode = true;
+      entry.package = packageName;
+      entry.sourceFile = relPath;
 
       if (cvaVariants) entry.variants = cvaVariants;
       if (cvaDefaults) entry.defaultVariants = cvaDefaults;
@@ -646,6 +768,8 @@ function buildRegistry(): Registry {
       if (radix.length > 0) entry.radixPrimitives = radix;
 
       if (storyMeta) {
+        // Code-derived story data is more precise than the mapping file's
+        // pre-listed names (Pass 1) — replace, don't just fall back to it.
         entry.stories = {
           file: storyMeta.file,
           path: storyMeta.title,
@@ -656,18 +780,41 @@ function buildRegistry(): Registry {
         }
       }
 
-      if (figma) {
-        entry.figma = {
-          nodeId: figma.entry.figmaId,
-          type: figma.entry.figmaType,
-        };
-        if (figma.entry.variantCount)
-          entry.figma.variantCount = figma.entry.variantCount;
-        entry.figma.sectionFrameId = figma.sectionFrameId;
-      }
-
       components[name] = entry;
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // PASS 2b — a mapping entry that names its own `sourceFile` is the project
+  // stating "this Figma component is implemented here", even when the code
+  // exports it under another name (e.g. Figma "Toast" -> ToastProvider/useToast,
+  // Figma "File" -> FileItem). Honour it instead of reporting a built
+  // component as Figma-only. Only when the file really exists.
+  // ---------------------------------------------------------------------
+  for (const [name, figma] of figmaByComponent) {
+    const entry = components[name];
+    const declared = figma.entry.sourceFile;
+    if (!entry || entry.presence.inCode || !declared) continue;
+    if (!existsSync(join(config.root, declared))) continue;
+    entry.presence.inCode = true;
+    entry.sourceFile = declared;
+    entry.codeIdentity = "mapped";
+  }
+
+  // ---------------------------------------------------------------------
+  // PASS 2c — compound parts. A code-only export that lives in the same source
+  // file as a component Figma does know (CardHeader in Card.tsx, DialogTitle in
+  // Dialog.tsx) is a part of that Figma component, not a component built without
+  // a design. Tag it `partOf` so reports don't list it as "no Figma source".
+  // ---------------------------------------------------------------------
+  const ownerBySource = new Map<string, string>();
+  for (const c of Object.values(components)) {
+    if (c.presence.inFigma && c.presence.inCode && c.sourceFile && !ownerBySource.has(c.sourceFile)) ownerBySource.set(c.sourceFile, c.name);
+  }
+  for (const c of Object.values(components)) {
+    if (c.presence.inFigma || !c.presence.inCode || !c.sourceFile) continue;
+    const owner = ownerBySource.get(c.sourceFile);
+    if (owner && owner !== c.name) c.partOf = owner;
   }
 
   // Build tokens section (compact form)
@@ -709,14 +856,14 @@ function buildRegistry(): Registry {
 
   // Load existing manifest for icons (optional)
   const manifest = readJson<{ icons?: { custom: string[]; remix: string[] } }>(
-    MANIFEST_PATH,
+    config.manifestPath,
   );
 
   // Assemble the registry
   const registry: Registry = {
     _meta: {
       version: "1.0.0",
-      generatedAt: new Date().toISOString(),
+      generatedAt: (config.now?.() ?? new Date()).toISOString(),
       generatedBy: "scripts/generate-ds-registry.ts",
     },
     components,
@@ -725,6 +872,18 @@ function buildRegistry(): Registry {
 
   if (figmaMap?._meta?.figmaFile) {
     registry._meta.figmaFile = figmaMap._meta.figmaFile;
+  }
+
+  const figmaMapSha256 = sha256(config.figmaMapPath);
+  if (figmaMapSha256) {
+    registry._meta.snapshot = {
+      source: "figma-mapping",
+      figmaFile: figmaMap?._meta?.figmaFile,
+      figmaVersion: figmaMap?._meta?.figmaVersion,
+      figmaModifiedAt: figmaMap?._meta?.figmaModifiedAt,
+      figmaMapSha256,
+      tokenMapSha256: sha256(config.tokenMapPath),
+    };
   }
 
   if (tokenMap?.stats) {
@@ -759,20 +918,47 @@ function buildRegistry(): Registry {
 // Main
 // ---------------------------------------------------------------------------
 
-const registry = buildRegistry();
-const json = JSON.stringify(registry, null, 2);
-writeFileSync(OUTPUT_PATH, `${json}\n`);
+export function writeRegistry(config: RegistryConfig = defaultConfig()): Registry {
+  const registry = buildRegistry(config);
+  writeFileSync(config.outputPath, `${JSON.stringify(registry, null, 2)}\n`);
+  return registry;
+}
 
-const componentCount = Object.keys(registry.components).length;
-const sectionCount = registry.sections.length;
-const tokenCount =
-  (registry._meta.tokenStats?.primitives ?? 0) +
-  (registry._meta.tokenStats?.semantic ?? 0);
+function main(): void {
+  const config = defaultConfig();
+  const registry = writeRegistry(config);
 
-console.log(`ds-registry.json generated:`);
-console.log(`  ${componentCount} components across ${sectionCount} sections`);
-console.log(`  ${tokenCount} tokens mapped`);
-console.log(
-  `  ${registry.icons?.custom.length ?? 0} custom icons, ${registry.icons?.remix.length ?? 0} remix icons`,
-);
-console.log(`  Output: ${OUTPUT_PATH.replace(`${ROOT}/`, "")}`);
+  const allComponents = Object.values(registry.components);
+  const componentCount = allComponents.length;
+  const sectionCount = registry.sections.length;
+  const tokenCount =
+    (registry._meta.tokenStats?.primitives ?? 0) +
+    (registry._meta.tokenStats?.semantic ?? 0);
+  const notYetBuilt = allComponents.filter(
+    (c) => c.presence.inFigma && !c.presence.inCode,
+  );
+  const builtWithoutFigma = allComponents.filter(
+    (c) => c.presence.inCode && !c.presence.inFigma && !c.partOf,
+  );
+
+  console.log(`ds-registry.json generated:`);
+  console.log(`  ${componentCount} components across ${sectionCount} sections`);
+  console.log(`  ${tokenCount} tokens mapped`);
+  console.log(
+    `  ${registry.icons?.custom.length ?? 0} custom icons, ${registry.icons?.remix.length ?? 0} remix icons`,
+  );
+  if (notYetBuilt.length > 0) {
+    console.log(
+      `  ${notYetBuilt.length} in Figma, not yet built: ${notYetBuilt.map((c) => c.name).join(", ")}`,
+    );
+}
+if (builtWithoutFigma.length > 0) {
+  console.log(
+    `  ${builtWithoutFigma.length} built without a Figma source: ${builtWithoutFigma.map((c) => c.name).join(", ")}`,
+  );
+}
+console.log(`  Output: ${config.outputPath.replace(`${config.root}/`, "")}`);
+}
+
+// Only run when executed directly (`tsx scripts/generate-ds-registry.ts`), not when imported by tests.
+if (process.argv[1] && resolve(process.argv[1]) === __filename) main();

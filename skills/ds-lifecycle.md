@@ -76,11 +76,11 @@ If the file exists, load it:
 }
 ```
 
-If the file is absent, generate it from the registry/manifest with all components set to `stage: "stable"` (safest default) and prompt the user to review.
+If the file is absent, generate it from the registry/manifest with all built components set to `stage: "stable"` (safest default) and prompt the user to review. Any registry component with `presence.inCode: false` (designed in Figma, not built yet) is seeded at `stage: "proposed"` instead — Figma-first means a designed component is a real, tracked entity before its first line of code.
 
 ### 1.2 Cross-Reference with Registry
 
-For each component in the registry/manifest, verify it has a lifecycle entry. Flag components with no entry as **UNTRACKED**.
+For each component in the registry/manifest, verify it has a lifecycle entry. **Skip registry entries with a `partOf` field** (`CardHeader`, `DialogTitle` …): they are compound parts of a component Figma knows and are tracked through their parent's entry, never as separate components. Flag components with no entry as **UNTRACKED**.
 
 ---
 
@@ -131,6 +131,12 @@ List all components grouped by lifecycle stage:
 
 Check for components that may be in the wrong stage or overdue for promotion.
 
+### 3.0 Figma-only and Figma-removed components
+
+- `presence.inCode: false` (designed in Figma, not built): the stage must be `proposed`, and it **cannot be promoted** to `alpha` or beyond until code exists. `promote` on it stops with "Not built yet — implement from the Figma properties (`/ds-spec <Name>`), then promote." Never create a stub component to satisfy a checklist.
+- `presence.inFigma: false` on a component that is `beta`/`stable` (and has no `partOf`): built without a Figma source. Report it for the design owner; do not delete anything and do not create Figma content.
+- `codeIdentity: "mapped"`: presence came from the mapping file's `sourceFile` (Figma "Toast" ↔ `ToastProvider`); treat as built.
+
 ### 3.1 Overdue for Promotion
 
 For each non-stable, non-deprecated component, check time-in-stage against recommended maximums:
@@ -156,7 +162,9 @@ For components approaching promotion to **stable**, verify:
 - [ ] Story file has at least 3 variants (default, disabled, error/edge case)
 - [ ] ds-wcag score: COMPLIANT or MINOR ISSUES only (≥ 14/20)
 - [ ] No open P0 issues in ds-wcag report
-- [ ] Token bindings verified (no hardcoded values in Figma)
+- [ ] Token bindings verified (no hardcoded values in Figma, and code uses the tokens Figma binds)
+- [ ] Figma parity: latest `/ds-audit-figma` shows MATCH for the component (code drift resolved toward Figma)
+- [ ] The Figma component itself is marked ready by its design owner — stability of the *implementation* never overrides the design status
 - [ ] ds-spec file exists
 - [ ] `changelog.md` or registry `changelog[]` entry for this release
 
@@ -212,6 +220,8 @@ Mark a component as deprecated and generate all required notices.
 
 ### 5.1 Collect Deprecation Info
 
+First confirm the design decision exists: the component is deprecated or replaced **in Figma** (or a designer has approved the deprecation). Deprecation starts in design; if Figma still treats it as current, stop and flag the mismatch rather than deprecating unilaterally in code.
+
 Ask for:
 - **Replacement component** (or "none")
 - **Removal target date** (e.g., "2026-10-01")
@@ -257,6 +267,7 @@ Validate that a component is safe to remove from the codebase.
 ### 6.1 Pre-removal Checklist
 
 - [ ] Stage is `deprecated`
+- [ ] The component is removed or deprecated in Figma (design owner has retired it)
 - [ ] Removal target date has passed (or is today)
 - [ ] Zero active usages in application code (run usage scan)
 - [ ] Replacement component has been available for ≥ 4 weeks in `stable`
@@ -276,7 +287,7 @@ If all checks pass, report what will be deleted and ask for confirmation before 
 
 ## Lifecycle State File
 
-`.claude/ds-lifecycle.json` is the source of truth for all lifecycle state. It should be committed to the repository so the team shares a single view of component maturity.
+`.claude/ds-lifecycle.json` is the source of truth for the *implementation's* maturity state (design status lives in Figma, and wins where they conflict). It should be committed to the repository so the team shares a single view of component maturity.
 
 To initialise it for an existing design system:
 

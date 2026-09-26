@@ -58,7 +58,7 @@ Components reference only semantic tokens. Switching brands is a single attribut
 
 ### Figma: One File Per Brand
 
-Each brand has its own Figma file with:
+Each brand has its own Figma file — authored independently by designers, and the source of truth for that brand. Code conforms to it; nothing here generates the Figma file from code. Each file has:
 - Its own variable collection (same semantic names, different resolved values)
 - The shared component library published from the main DS file
 - Brand-specific styles applied via variable overrides (not separate components)
@@ -128,10 +128,10 @@ If the registry is used, either:
 Pass the brand as a flag or argument. Skills check the registry for a matching brand entry and load the correct mapping/token files.
 
 ```bash
-# Sync Brand A to Figma (default)
+# Bring Brand A's code into line with its Figma file (default)
 /ds-sync
 
-# Sync Brand B to Figma
+# Bring Brand B's code into line with its Figma file
 /ds-sync --brand brand-b
 
 # Run a parity report for Brand B

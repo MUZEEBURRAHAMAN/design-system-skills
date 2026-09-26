@@ -8,20 +8,20 @@ AI tools like Cursor, Lovable, v0, and Google Stitch look for `DESIGN.md` in the
 
 ## Generate It
 
-Run `/ds-design-md` to generate `DESIGN.md` from your existing design system data. The skill reads your token map, Figma variables, CSS files, component registry, and prior prototyping decisions.
+Run `/ds-design-md` to generate `DESIGN.md` from your existing design system data. The skill reads your Figma variables and text styles first (the source of truth), then cross-checks your token map and CSS files, and adds the component registry and prior prototyping decisions.
 
 ```bash
 # Generate .claude/DESIGN.md (used by ds-proto and ds-spec)
 /ds-design-md
 
-# Generate with Figma typography styles and variable values (richer output)
-/ds-design-md --figma
+# Degraded fallback when Figma isn't reachable: code-only, labelled as such in the file
+/ds-design-md --no-figma
 
 # Write to project root (picked up by Cursor, Lovable, Google Stitch)
 /ds-design-md --root
 
 # Both locations
-/ds-design-md --figma --root
+/ds-design-md --root
 ```
 
 ---
@@ -33,11 +33,11 @@ A complete DESIGN.md has seven sections:
 | Section | Source | What it captures |
 |---------|--------|-----------------|
 | **Visual Theme** | proto-decisions.md + token analysis | Mood, aesthetic, personality (2–4 sentences) |
-| **Color Palette** | Token map + Figma variables | Semantic tokens with light/dark hex values and usage rules |
-| **Typography** | CSS tokens + Figma text styles | Font families, full type scale with sizes/weights/line heights |
+| **Color Palette** | Figma variables (cross-checked against the token map) | Semantic tokens with light/dark hex values and usage rules |
+| **Typography** | Figma text styles (CSS tokens only under `--no-figma`) | Font families, full type scale with sizes/weights/line heights |
 | **Spacing** | CSS tokens + Tailwind config | Base unit, scale, common padding/gap patterns, border radius |
 | **Components** | DS registry | Available sections, size and state conventions |
-| **Elevation** | CSS shadow tokens + Figma effects | Shadow levels mapped to semantic uses |
+| **Elevation** | Figma effects (CSS shadow tokens only under `--no-figma`) | Shadow levels mapped to semantic uses |
 | **Design Guidelines** | proto-decisions.md | Do/don'ts distilled from established patterns |
 | **Agent Prompt Guide** | Registry + meta | Package name, Storybook URL, token system — quick reference for AI |
 
@@ -58,6 +58,7 @@ Both can coexist. Generate both with `/ds-design-md --root`.
 
 DESIGN.md is generated from live sources but it's not auto-regenerated on every run. Regenerate it when:
 
+- **Figma changes** — variables, text styles, or effects edited (this is the primary trigger)
 - Tokens change (new semantic colors, spacing scale updates)
 - Typography is updated (new font, scale changes)
 - Major component patterns are added or removed
@@ -158,7 +159,7 @@ The Agent Prompt Guide section is omitted in spec output — it's Claude Code-sp
 
 ### CLI tools
 
-With the `design.md` CLI installed (`npm install --save-dev design.md`):
+With the `design.md` CLI installed (`npm install --save-dev @google/design.md`):
 
 ```bash
 # Validate the file — broken references, contrast, missing tokens, section order
@@ -169,7 +170,7 @@ npx design.md diff DESIGN.md DESIGN.md.prev
 
 # Export tokens to Tailwind config or W3C DTCG format
 npx design.md export --format tailwind DESIGN.md > tailwind-tokens.js
-npx design.md export --format w3c DESIGN.md > tokens.json
+npx design.md export --format dtcg DESIGN.md > tokens.json
 ```
 
 `/ds-design-md --spec` runs the linter automatically after writing the file and reports any violations.

@@ -1,8 +1,10 @@
 {
   "_meta": {
-    "description": "Storybook story IDs ↔ Figma node IDs mapping for ds-sync. Copy this to .claude/ds-story-figma-map.json and fill in your IDs.",
+    "description": "Figma node IDs -> Storybook story IDs mapping. Copy this to .claude/ds-story-figma-map.json and fill in your IDs. A section component with no 'sourceFile' (e.g. DatePicker below) is a real component designed in Figma but not yet built -- the registry generator gives it a full entry with presence.inCode: false, not a footnote.",
     "generated": "2026-01-01",
     "figmaFile": "YOUR_FIGMA_FILE_KEY",
+    "figmaVersion": "FIGMA_FILE_VERSION_AT_REFRESH",
+    "figmaModifiedAt": "2026-01-01T00:00:00.000Z",
     "storybookBase": "http://localhost:6006/iframe.html?id={storyId}&viewMode=story&globals=theme:{theme}",
     "semanticCollection": "VariableCollectionId:XXXX:YYYY",
     "lightMode": "XXXX:0",
@@ -52,6 +54,12 @@
             "components-forms-input--with-error"
           ],
           "sourceFile": "src/components/input/input.tsx"
+        },
+        "DatePicker": {
+          "figmaId": "FIGMA_COMPONENT_SET_ID",
+          "figmaType": "COMPONENT_SET",
+          "variantCount": 6,
+          "stories": ["forms-datepicker--default", "forms-datepicker--range"]
         }
       }
     }

@@ -103,7 +103,8 @@ Build a flat Figma variable map keyed by name:
 
 Match CSS tokens to Figma variables by normalising names:
 - Strip `--` prefix from CSS variable names
-- Normalise separators (`-`, `_`) to the same form
+- Normalise separators (`-`, `_`, and Figma's group separator `/`) to the same form (Figma names like `color/text/primary` match `--color-text-primary`)
+- Light/dark: some files keep dark values in a **second collection** (e.g. `02 — COLOR / SEMANTIC` and `02 — COLOR / SEMANTIC — DARK`) rather than a second mode. Pair them by name (same variable name, collection name ending in `DARK`); the dark value is the paired variable's resolved value, else the light value
 - Case-insensitive comparison
 
 For each CSS token, attempt to find a Figma variable with a matching name.
@@ -197,46 +198,53 @@ Output a structured report to stdout and write a summary to `.claude/ds-token-va
 
 **Token parity score:** X% (target: 100%)
 
-## Mismatches
+## Mismatches (fix in code — Figma's value is correct)
 
 | CSS Token | Figma Variable | Light CSS | Light Figma | Dark CSS | Dark Figma | Status |
 |-----------|---------------|-----------|-------------|----------|------------|--------|
 | --surface-bg | surface-background | #f9fafb | #f9fafb | #111111 | #0d0d0d | VALUE_MISMATCH |
 
-## Missing in Figma (add to Figma)
-
-| CSS Token | Resolved Light | Resolved Dark | Suggested Collection |
-|-----------|---------------|---------------|----------------------|
-| --overlay-scrim | rgba(0,0,0,0.5) | rgba(0,0,0,0.7) | Semantic |
-
-## Missing in Code (add to CSS or remove from Figma)
+## Figma Variables Missing From Code (add to CSS)
 
 | Figma Variable | Collection | Light Value | Dark Value | Used by Components |
 |---------------|------------|-------------|------------|-------------------|
 | border/subtle | Semantic | #e5e7eb | #374151 | Input, Divider |
 
-## Orphaned Figma Variables (never bound to a component)
+## Code Tokens With No Figma Variable (needs a design decision — not auto-fixed either direction)
+
+| CSS Token | Resolved Light | Resolved Dark | Note |
+|-----------|---------------|---------------|------|
+| --overlay-scrim | rgba(0,0,0,0.5) | rgba(0,0,0,0.7) | Either this is a real design decision that should be formalised as a Figma variable, or it's a stray token that shouldn't exist in code. A designer decides which — this skill only flags it. |
+
+## Figma Variables Missing a Dark-Mode Value (a real gap in Figma's own definition)
+
+| Variable | Collection | Light Value | Note |
+|----------|------------|-------------|------|
+| success/border | Semantic | #16a34a | No dark value defined yet — this is Figma's own gap to fill, not something code can infer |
+
+## Orphaned Figma Variables (defined but never bound — needs a design decision)
 
 | Variable | Collection | Suggestion |
 |----------|------------|------------|
-| legacy/button-hover | Primitive | Delete or bind to a component |
+| legacy/button-hover | Primitive | Either bind it to a component, or a designer should retire it in Figma — this skill only flags it, it doesn't delete Figma variables |
 
-## Alias Chain Mismatches
+## Alias Chain Mismatches (fix in code — Figma's chain is correct)
 
 | Token | CSS Chain | Figma Chain | Action |
 |-------|-----------|-------------|--------|
-| --destructive | color-red-600 → #dc2626 | color/danger → #ef4444 | Align Figma alias to color/red-600 |
+| --destructive | color-red-600 → #dc2626 | color/danger → #ef4444 | Point the CSS alias at `--color-danger` to match Figma's chain |
 
 ## Action Items
 
-### In Figma
-1. Add missing variables: [list]
-2. Fix value mismatches: [list with correct values]
-3. Add dark mode values: [list]
+### In Code (do this — Figma is correct)
+1. Add missing tokens: [Figma variables with no CSS counterpart]
+2. Fix value mismatches: [list — always bring the CSS value to Figma's resolved value]
+3. Fix alias chain mismatches: [list — repoint the CSS alias, never Figma's]
 
-### In Code
-1. Add missing tokens: [list]
-2. Remove or archive: [list of orphaned Figma-only tokens]
+### Needs a Design Decision (this skill does not resolve these automatically)
+1. Formalise or remove code-only tokens: [list]
+2. Bind or retire orphaned Figma variables: [list]
+3. Figma variables missing a dark-mode value: [list — flag for the designer who owns the Figma file]
 ```
 
 ---
@@ -249,6 +257,9 @@ If `--generate` or `--update` flag is set, write `.claude/ds-token-map.json`:
 {
   "_meta": {
     "generatedAt": "2026-04-17T00:00:00Z",
+    "figmaFile": "FIGMA_FILE_KEY",
+    "figmaVersion": "1234567890",
+    "figmaModifiedAt": "2026-04-16T09:30:00.000Z",
     "cssTokenCount": 124,
     "figmaVariableCount": 118,
     "parityScore": 94
@@ -279,6 +290,8 @@ If `--generate` or `--update` flag is set, write `.claude/ds-token-map.json`:
 }
 ```
 
+`figmaVersion`/`figmaModifiedAt` record which state of the Figma file this map was read from (REST `GET /v1/files/:key`, or the Figma Console MCP file-data/version tools) — `scripts/check-snapshot.mjs` refuses a snapshot without them.
+
 For `--update`, merge with the existing map: preserve manually-set overrides (entries with `"manual": true`), add new MATCH entries, flag changed statuses.
 
 ---
@@ -286,9 +299,12 @@ For `--update`, merge with the existing map: preserve manually-set overrides (en
 ## Key Rules
 
 1. **Never modify CSS or Figma during `--report-only`** — validation is always safe to run
-2. **Token map drives ds-sync** — a high-quality token map directly improves sync accuracy
-3. **Both modes required** — a token missing a dark mode value is a P1 issue
-4. **Alias chains must align** — mismatched alias chains cause subtle drift that raw value matching misses
+2. **Figma's value is correct** — a value mismatch or alias-chain mismatch is always fixed in CSS. This skill never proposes changing a Figma variable's value.
+3. **Never write to Figma** — not even the orphaned-variable and missing-dark-mode-value findings get auto-fixed in Figma; they're flagged for whoever owns the Figma file to decide (Guardrail 1, [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md))
+4. **A code-only token isn't automatically wrong** — it needs a design decision (formalise it in Figma, or remove it from code), not an automatic fix either way
+5. **Token map drives ds-sync** — a high-quality token map directly improves sync accuracy
+6. **Both modes required** — a Figma variable missing a dark-mode value is a P1 issue for the design file
+7. **Alias chains must align** — mismatched alias chains cause subtle drift that raw value matching misses
 
 ## Usage
 

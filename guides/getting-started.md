@@ -1,6 +1,6 @@
 # Getting Started
 
-Set up Claude Code skills for design system workflows. By the end you'll have a running Storybook-to-Figma sync.
+Set up Claude Code skills for design system workflows. By the end you'll have a Figma-first workflow: Figma defines the design system, and these skills audit — and propose fixes to — your Storybook/code implementation against it. Read [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) first; it's the one policy every skill follows.
 
 **Time estimate:** 1–2 hours (mostly Figma MCP setup and mapping file creation)
 
@@ -11,7 +11,7 @@ Set up Claude Code skills for design system workflows. By the end you'll have a 
 You need:
 
 - **A component library** with [Storybook](https://storybook.js.org/) stories
-- **A Figma file** that mirrors your components (or one you want to build)
+- **A Figma file** with your design system's Variables, Styles, and Components — this is the source of truth (it can be ahead of your code; components not built yet are welcome)
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** installed (`npm install -g @anthropic-ai/claude-code`)
 - **[Figma Desktop](https://www.figma.com/downloads/)** (not the browser version — the Desktop Bridge plugin requires it)
 - **Node.js** 18+ and a package manager (npm, pnpm, or yarn)
@@ -20,7 +20,7 @@ You need:
 
 ## Step 1: Set Up Figma Console MCP
 
-The Figma Console MCP server gives Claude access to your Figma file: reading nodes, variables, and styles, and writing changes back.
+The Figma Console MCP server gives Claude access to your Figma file: reading nodes, variables, and styles. The skills in this toolkit only read from Figma; they never write to it.
 
 ### 1.1 Install the MCP Server
 
@@ -314,15 +314,22 @@ To see the full state of your design system across all three pillars:
 
 This produces a drift score and a component-by-component parity matrix.
 
-### Figma Sync
+### Bring Code Into Line With Figma
 
-To sync a component from Storybook to Figma:
+To align a component's implementation with its Figma design:
 
 ```bash
 /ds-sync Button
 ```
 
-This renders the Button in Storybook, compares it to the Figma component, and writes any needed adjustments back to Figma using bound variables.
+This renders the Button in Storybook, compares it to the Figma component, and reports drift. Token-value fixes are applied to your CSS token file; spacing and structural fixes are proposed for you to confirm. Nothing is written to Figma.
+
+To see what Figma has designed that isn't built yet:
+
+```bash
+pnpm ds:registry   # entries with presence.inCode: false
+/ds-spec RatingStars   # spec generated from the Figma component, ready to implement from
+```
 
 ---
 
@@ -351,7 +358,7 @@ This renders the Button in Storybook, compares it to the Figma component, and wr
 
 ## Optional: Set Up Figma Code Connect
 
-[Figma Code Connect](code-connect.md) publishes your real component API (props, variants, import paths) to Figma's Dev Mode and the MCP server. Every Figma skill gets more accurate because Claude reads your actual component contracts instead of inferring them.
+[Figma Code Connect](code-connect.md) publishes your real component API (props, variants, import paths) to Figma's Dev Mode and the MCP server. Publishing is an explicit, approved action (a dry run first, then a person decides) — see the guide. It publishes implementation status against your Figma components — Figma's own variant and property definitions stay canonical, and Code Connect records which code implements them.
 
 Two options:
 - **Code Connect CLI** — write `.figma.tsx` files alongside your components, publish from terminal

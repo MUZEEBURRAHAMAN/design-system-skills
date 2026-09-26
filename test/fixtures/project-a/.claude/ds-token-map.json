@@ -1,0 +1,5 @@
+{
+  "primitives": { "--blue-bay": { "figmaHex": "#0066CC", "figmaVarId": "VariableID:1:100", "figmaVarName": "blue-bay" } },
+  "semantic": { "--primary-foreground": { "figmaHex": "#1A1A2E", "figmaVarId": "VariableID:1:200", "figmaVarName": "primary-foreground", "lightAlias": "slate-900", "darkAlias": "white" } },
+  "stats": { "totalPrimitivesMapped": 1, "totalSemanticMapped": 1 }
+}

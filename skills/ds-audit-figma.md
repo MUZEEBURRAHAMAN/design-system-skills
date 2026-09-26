@@ -4,7 +4,7 @@ description: Figma-to-Storybook visual parity audit (read-only spot-check)
 
 # Figma–Storybook Parity Audit
 
-Run a comprehensive audit comparing the Figma Design System file against the Storybook component library. For each component, capture screenshots in both systems, extract computed visual properties, diff them per-variant, and produce a structured report with drift scores and prioritised action items.
+Run a comprehensive audit comparing the Figma Design System file against the Storybook component library. For each component, capture screenshots in both systems, extract computed visual properties, diff them per-variant, and produce a structured report with drift scores and prioritised action items. Figma is the reference — see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) — so every finding here is "the implementation drifted," and every action item points at fixing code (via `/ds-sync`), never at fixing Figma.
 
 ## Prerequisites
 
@@ -263,21 +263,25 @@ Use `figma_get_variables` to check all semantic colour tokens have both Light an
 
 ```js
 // figma_execute
-const collections = figma.variables.getLocalVariableCollections();
-const semanticCollection = collections.find(c => c.name === 'Semantic');
-const variables = semanticCollection
-  ? figma.variables.getLocalVariables().filter(v => v.variableCollectionId === semanticCollection.id)
-  : [];
-return variables.map(v => ({
-  name: v.name,
-  id: v.id,
-  modes: Object.entries(v.valuesByMode).map(([modeId, val]) => ({ modeId, value: val }))
-}));
+// Do not assume a collection literally named "Semantic": match by name pattern (e.g. "02 — COLOR / SEMANTIC",
+// "03 — COLOR / AI"). A dark theme may be a separate collection whose name ends in DARK instead of a second mode.
+const collections = await figma.variables.getLocalVariableCollectionsAsync();
+const semanticCollections = collections.filter(c => /semantic|COLOR \/ AI/i.test(c.name));
+if (semanticCollections.length === 0) return { error: 'no semantic collection found', collections: collections.map(c => c.name) };
+const all = await figma.variables.getLocalVariablesAsync();
+const ids = new Set(semanticCollections.map(c => c.id));
+return all.filter(v => ids.has(v.variableCollectionId)).map(v => {
+  const col = semanticCollections.find(c => c.id === v.variableCollectionId);
+  return {
+    name: v.name, id: v.id, collection: col.name, isDarkCollection: /DARK$/.test(col.name),
+    modes: Object.entries(v.valuesByMode).map(([modeId, val]) => ({ modeId, value: val }))
+  };
+});
 ```
 
 Report:
 - Total variables with Light+Dark values
-- Variables missing a mode value
+- Variables missing a mode value (for a separate `... DARK` collection: a light variable with no same-named dark variable)
 - Variables with identical Light and Dark values (possible oversight)
 
 ---
@@ -355,7 +359,8 @@ Write a markdown parity report:
 
 ## Guidelines
 
-- **Read-only** — this skill never modifies code or Figma
+- **Read-only** — this skill never modifies code or Figma, under any flag (Guardrail 1, SOURCE-OF-TRUTH.md)
+- **Figma is the reference** — every DRIFT/MISMATCH is implementation drift, never "Figma is out of date"
 - **Visual-first** — use screenshots for comparison, not just metadata
 - **Token-aware** — check that Figma components use variable bindings, not hardcoded values
 - **Both themes** — use `--themes` to explicitly check light + dark; always report when only one was checked

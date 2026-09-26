@@ -1,0 +1,213 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "generatedAt": "2026-09-26T00:00:00.000Z",
+    "generatedBy": "scripts/generate-ds-registry.ts",
+    "figmaFile": "FIXTURE_FILE_KEY",
+    "snapshot": {
+      "source": "figma-mapping",
+      "figmaFile": "FIXTURE_FILE_KEY",
+      "figmaVersion": "1234567890",
+      "figmaModifiedAt": "2026-09-20T10:00:00.000Z",
+      "figmaMapSha256": "a4a430b15de1e8790b931a76de314362d6d6afa08e86059916b32fe32b2a4f1a",
+      "tokenMapSha256": "20608d827eec8b33dccb9562f96c4478e4e008da38cd7bdb9acd095b58bd63d5"
+    },
+    "tokenStats": {
+      "primitives": 1,
+      "semantic": 1
+    }
+  },
+  "components": {
+    "Button": {
+      "name": "Button",
+      "section": "Actions",
+      "presence": {
+        "inFigma": true,
+        "inCode": true
+      },
+      "figma": {
+        "nodeId": "10:2",
+        "type": "COMPONENT_SET",
+        "variantCount": 4,
+        "sectionFrameId": "10:1"
+      },
+      "stories": {
+        "file": "packages/ds/stories/button.stories.tsx",
+        "path": "Components/Actions/Button",
+        "variants": [
+          "Primary",
+          "Secondary",
+          "Loading"
+        ]
+      },
+      "package": "@acme/ds",
+      "sourceFile": "packages/ds/src/components/button.tsx",
+      "variants": {
+        "intent": [
+          "primary",
+          "secondary"
+        ],
+        "size": [
+          "small",
+          "large"
+        ]
+      },
+      "defaultVariants": {
+        "intent": "primary",
+        "size": "small"
+      },
+      "props": {
+        "loading": "boolean",
+        "icon": "ReactNode"
+      },
+      "tokens": [
+        "primary-background",
+        "primary-foreground",
+        "surface-background"
+      ]
+    },
+    "IconButton": {
+      "name": "IconButton",
+      "section": "Actions",
+      "presence": {
+        "inFigma": true,
+        "inCode": false
+      },
+      "figma": {
+        "nodeId": "10:3",
+        "type": "COMPONENT_SET",
+        "variantCount": 2,
+        "sectionFrameId": "10:1"
+      },
+      "stories": {
+        "variants": [
+          "components-actions-iconbutton--default",
+          "components-actions-iconbutton--disabled"
+        ]
+      }
+    },
+    "Badge": {
+      "name": "Badge",
+      "section": "Data Display",
+      "presence": {
+        "inFigma": true,
+        "inCode": true
+      },
+      "figma": {
+        "nodeId": "20:2",
+        "type": "COMPONENT_SET",
+        "variantCount": 2,
+        "sectionFrameId": "20:1"
+      },
+      "package": "@acme/ds",
+      "sourceFile": "packages/ds/src/components/badge.tsx",
+      "variants": {
+        "intent": [
+          "neutral",
+          "positive"
+        ]
+      },
+      "defaultVariants": {
+        "intent": "neutral"
+      },
+      "tokens": [
+        "neutral-foreground",
+        "neutral-surface",
+        "positive-foreground",
+        "positive-surface"
+      ],
+      "stories": {
+        "file": "packages/ds/stories/badge.stories.tsx",
+        "path": "Components/Data Display/Badge",
+        "variants": [
+          "Default",
+          "Positive"
+        ]
+      }
+    },
+    "DatePicker": {
+      "name": "DatePicker",
+      "section": "Forms",
+      "presence": {
+        "inFigma": true,
+        "inCode": false
+      },
+      "figma": {
+        "nodeId": "30:2",
+        "type": "COMPONENT_SET",
+        "variantCount": 6,
+        "sectionFrameId": "30:1"
+      }
+    },
+    "LegacyChip": {
+      "name": "LegacyChip",
+      "section": "Uncategorized",
+      "presence": {
+        "inFigma": false,
+        "inCode": true
+      },
+      "package": "@acme/ds",
+      "sourceFile": "packages/ds/src/components/legacy-chip.tsx",
+      "tokens": [
+        "surface-background"
+      ]
+    },
+    "Datepicker": {
+      "name": "Datepicker",
+      "section": "Uncategorized",
+      "presence": {
+        "inFigma": false,
+        "inCode": true
+      },
+      "package": "@acme/ds",
+      "sourceFile": "packages/ds/src/components/datepicker.tsx",
+      "tokens": [
+        "stroke-input"
+      ]
+    }
+  },
+  "sections": [
+    "Actions",
+    "Data Display",
+    "Forms",
+    "Uncategorized"
+  ],
+  "tokens": {
+    "primitives": {
+      "--blue-bay": {
+        "hex": "#0066CC",
+        "figmaVarId": "VariableID:1:100",
+        "figmaName": "blue-bay"
+      }
+    },
+    "semantic": {
+      "--primary-foreground": {
+        "figmaVarId": "VariableID:1:200",
+        "figmaName": "primary-foreground",
+        "darkAlias": "white",
+        "lightAlias": "slate-900"
+      }
+    }
+  },
+  "icons": {
+    "custom": [
+      "LogoIcon"
+    ],
+    "remix": [
+      "RiSearchLine"
+    ]
+  },
+  "outliers": {
+    "storybookOnly": {
+      "useDebounce": {
+        "reason": "Hook: no visual Figma counterpart"
+      }
+    },
+    "figmaOnly": {
+      "ColorPalette": {
+        "figmaId": "99:1",
+        "reason": "Documentation-only frame in Figma"
+      }
+    }
+  }
+}

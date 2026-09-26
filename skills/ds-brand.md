@@ -4,12 +4,12 @@ description: Fork a DESIGN.md into a brand variant by overriding tokens, then va
 
 # DS Brand
 
-Fork an existing spec-compliant `DESIGN.md` into a brand variant by overriding color, typography, and spacing tokens. The fork inherits all tokens not explicitly overridden, runs the `design.md` linter, and validates WCAG contrast ratios on every foreground/background pair.
+Fork an existing spec-compliant `DESIGN.md` into a brand variant *proposal* by overriding color, typography, and spacing tokens. The overrides come from the command line, not from Figma, so the output is a **proposal, not a design of record**: it is stamped `<!-- ds-source: brand-proposal -->` and only becomes a real brand once a designer builds it in that brand's Figma file (see `guides/multi-brand.md`) and `/ds-design-md` regenerates it from there. The fork inherits all tokens not explicitly overridden, runs the `design.md` linter, and validates WCAG contrast ratios on every foreground/background pair.
 
 ## Prerequisites
 
-- A source `DESIGN.md` with YAML front matter (generated with `/ds-design-md --spec`)
-- `design.md` CLI installed (`npm install --save-dev design.md`)
+- A source `DESIGN.md` with YAML front matter (generated with `/ds-design-md --spec`) whose provenance comment is `ds-source: figma-live` — a brand fork of a code-fallback file would spread unverified values; the skill warns and asks before continuing
+- `design.md` CLI installed (`npm install --save-dev @google/design.md`)
 
 ## Arguments
 
@@ -54,7 +54,7 @@ Assemble the brand DESIGN.md:
 2. Copy the markdown body from the source file, updating any inline hex values or token names that appear in the prose to match the overrides. Sections that contain no token references carry over verbatim.
 3. Update the `## Overview` section to note the brand variant: append one sentence identifying it as a fork of the source (e.g. "This is the Partner brand variant. Primary and surface colors differ from the base.").
 
-Write to `<out>/<brand-name>.DESIGN.md`.
+Write to `<out>/<brand-name>.DESIGN.md`, carrying `<!-- ds-source: brand-proposal; base: <source path>; generatedAt: <ISO> -->` on the line immediately after the front matter's closing `---` (the front matter must stay first or its tokens are ignored) so no downstream tool mistakes it for a Figma-verified file.
 
 ---
 
@@ -104,7 +104,7 @@ Contrast
     Suggested adjustment: #c0152d (4.6:1)
   ✓ muted / background         4.6:1
 
-Action required: 1 contrast failure. Adjust colors.primary before using this variant in production.
+Action required: 1 contrast failure. Ask the brand's designer to adjust colors.primary in that brand's Figma file (a passing value is suggested above) — don't ship these overrides from code.
 ```
 
 ---

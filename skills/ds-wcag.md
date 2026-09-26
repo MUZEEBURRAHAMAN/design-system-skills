@@ -80,7 +80,9 @@ Read the component source file and verify:
 
 ### 2.2 Rendered Audit (Storybook + axe-core)
 
-Navigate to the component's default story in Storybook and run axe-core programmatically:
+Navigate to the component's default story in Storybook and run axe-core programmatically.
+
+**Let the page settle first.** After loading a story or switching theme (`globals=theme:dark`), wait ≥ 1.5 s (colour transitions are 100–300 ms) before running axe. Measured mid-transition, axe reports a phantom `color-contrast` failure that disappears on a clean re-run (seen on the real AI UI Kit's dark Approval Request). Re-run any single contrast failure once after settling before reporting it; report it only if it reproduces. Confirm the theme really switched (`document.documentElement.dataset.theme`) so a "dark" pass is not a light page.
 
 ```js
 // In preview_eval:
@@ -147,7 +149,7 @@ For the component's default and key variant states:
 4. Repeat for dark theme (reload story with `&globals=theme:dark`)
 
 **Token-level check (if Figma connected):**
-If the Figma Desktop Bridge is available, also cross-reference the Storybook computed colors against Figma variable bindings to ensure the Figma component uses the same tokens.
+If the Figma Desktop Bridge is available, also cross-reference the Storybook computed colors against Figma's variable bindings (the reference) and flag any place the implementation uses a different token than Figma binds — that's a code fix, never a Figma change.
 
 ---
 
@@ -252,7 +254,7 @@ For P0 and P1 issues where the fix is clear and mechanical, run a fix-then-verif
 After Phase 3, collect all P0 and P1 issues across all components. Classify each as:
 
 - **AUTO** — can be applied mechanically with the Edit tool
-- **MANUAL** — requires design or structural judgment
+- **MANUAL** — requires design or structural judgment. **Colour contrast failures are always MANUAL/design issues**: the colours come from Figma's variables, so the fix is a designer's decision in Figma. Never auto-fix contrast by editing a token or picking a different colour in code (that would make code the design authority). The only code-side contrast fix is when code's value *differs* from Figma's — that's drift, fixed toward Figma via `/ds-sync`
 
 **Auto-fixable patterns:**
 
@@ -390,7 +392,7 @@ Use the WCAG 2.0 luminance formula from `.claude/rules/accessibility.md` section
 ### Failing Pairs
 | Component | Theme | Pair | Ratio | Required | Fix |
 |-----------|-------|------|-------|----------|-----|
-| Input | Dark | --muted-foreground / --surface-background | 3.1:1 | 4.5:1 | Darken --muted-foreground in dark mode |
+| Input | Dark | --muted-foreground / --surface-background | 3.1:1 | 4.5:1 | **Design issue** — Figma variable `muted-foreground` (Dark) fails 4.5:1; designer adjusts it in Figma (a passing value is ≥ ~#8a8f98 for reference). Do not override the token in code |
 ```
 
 ---

@@ -1,6 +1,8 @@
-# Design System Skills for Claude Code
+# Design System Skills for Claude Code (Figma-first fork)
 
-Open-source [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code) for managing design systems across **Code**, **Storybook**, and **Figma**. Run accessibility audits, sync components bidirectionally, track drift, and prototype from the terminal.
+> **This fork changes the source of truth.** Upstream is code-first (its README says code wins any disagreement). Here, **Figma is canonical**: Variables/Styles/Components → spec → implementation → audit. Skills read Figma and never write to it. Read [SOURCE-OF-TRUTH.md](SOURCE-OF-TRUTH.md) — it's short, and every skill follows it. Forked from [NewMediaStudio/design-system-skills](https://github.com/NewMediaStudio/design-system-skills) (MIT).
+
+Open-source [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code) for managing a design system whose source of truth is **Figma**, implemented in **Code** and documented in **Storybook**. Run accessibility audits, bring code into line with Figma, track drift, and prototype from the terminal.
 
 📖 **Read the article:** [Your Design System Is the Moat Against Product Slop](https://www.linkedin.com/pulse/your-design-system-moat-against-product-slop-guide-makhouleen-by1qe)
 
@@ -10,15 +12,15 @@ Open-source [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code)
 
 | Skill                                          | Command           | Description                                                                                                                                               |
 | ---------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **[DS Sync](skills/ds-sync.md)**               | `/ds-sync`        | Sync Storybook components to Figma — renders each component, compares it to its Figma counterpart, and writes adjustments back using only bound variables |
+| **[DS Sync](skills/ds-sync.md)**               | `/ds-sync`        | Pull Figma into code — renders each Storybook component, compares it to its Figma counterpart, applies token fixes to CSS and proposes structural fixes. Never writes to Figma |
 | **[DS WCAG](skills/ds-wcag.md)**               | `/ds-wcag`        | WCAG 2.1 Level AA accessibility audit — source analysis, axe-core, keyboard testing, dual-theme contrast checks, and an auto-fix loop                    |
 | **[DS Report](skills/ds-report.md)**           | `/ds-report`      | Cross-reference Code, Storybook, and Figma to produce a parity report with drift scores and historical benchmarks                                         |
 | **[DS Proto](skills/ds-proto.md)**             | `/ds-proto`       | Prototype layouts using your existing design system components with accessibility guardrails                                                              |
-| **[DS Spec](skills/ds-spec.md)**               | `/ds-spec`        | Generate structured component specs — anatomy, API, tokens, structure, and accessibility in a single pass                                                 |
-| **[DS Tokens](skills/ds-tokens.md)**           | `/ds-tokens`      | Validate CSS token parity against Figma variables — detects mismatches, missing tokens, orphaned variables, and generates `.claude/ds-token-map.json`    |
+| **[DS Spec](skills/ds-spec.md)**               | `/ds-spec`        | Generate structured component specs from the Figma component — anatomy, API, tokens, structure, accessibility — and check code against them                                                 |
+| **[DS Tokens](skills/ds-tokens.md)**           | `/ds-tokens`      | Validate CSS tokens against Figma variables (Figma is correct) — detects mismatches, missing tokens, orphaned variables, and generates `.claude/ds-token-map.json`    |
 | **[DS Usage](skills/ds-usage.md)**             | `/ds-usage`       | Scan the codebase for component adoption, shadow copies, override patterns, and unused components — outputs per-team adoption metrics                     |
 | **[DS Lifecycle](skills/ds-lifecycle.md)**     | `/ds-lifecycle`   | Track component lifecycle stages (proposed → alpha → beta → stable → deprecated → removed), enforce promotion criteria, and generate deprecation notices |
-| **[DS Design MD](skills/ds-design-md.md)**     | `/ds-design-md`   | Generate a `DESIGN.md` from your token map, Figma variables, typography, and component patterns — readable by any AI agent and compliant with the [google-labs-code/design.md](https://github.com/google-labs-code/design.md) spec (`--spec` flag) |
+| **[DS Design MD](skills/ds-design-md.md)**     | `/ds-design-md`   | Generate a `DESIGN.md` from Figma variables and text styles (read live by default; `--no-figma` is a labelled fallback), cross-checked against code — readable by any AI agent and compliant with the [google-labs-code/design.md](https://github.com/google-labs-code/design.md) spec (`--spec` flag) |
 | **[DS Audit Figma](skills/ds-audit-figma.md)** | `/ds-audit-figma` | Figma-to-Storybook visual parity audit — per-component and per-variant screenshot diff, property extraction, drift scoring, and mapping health check     |
 | **[DS Diff](skills/ds-diff.md)**               | `/ds-diff`        | Compare `DESIGN.md` token values across git refs — surfaces color shifts, contrast regressions, and removed tokens before they ship                      |
 | **[DS Export](skills/ds-export.md)**           | `/ds-export`      | Convert `DESIGN.md` front matter tokens to Tailwind config, W3C DTCG JSON, Style Dictionary, or CSS custom properties                                   |
@@ -37,7 +39,7 @@ Open-source [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code)
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | **[Getting Started](guides/getting-started.md)**               | End-to-end setup: Figma MCP, Storybook, mapping file, and your first sync                        |
 | **[DS Registry](guides/ds-registry.md)**                       | Unified JSON registry — one file for all component, story, Figma, and token metadata             |
-| **[Mapping File](guides/mapping-file.md)**                     | How to create and maintain the Storybook-to-Figma mapping JSON                                   |
+| **[Mapping File](guides/mapping-file.md)**                     | How to create and maintain the Figma-to-Storybook mapping JSON                                   |
 | **[Code Connect](guides/code-connect.md)**                     | Optional: link production components to Figma Dev Mode and the MCP server via Figma Code Connect |
 | **[CI Integration](guides/ci-integration.md)**                 | Run DS skills in CI — WCAG gates, drift thresholds, shadow copy detection, and PR comments       |
 | **[Component Versioning](guides/component-versioning.md)**     | Semantic versioning for DS components, codemods, deprecation notices, and migration guides       |
@@ -64,11 +66,12 @@ Copy the skills you want into your project's `.claude/commands/` directory:
 
 ```bash
 # Clone this repo
-git clone https://github.com/NewMediaStudio/design-system-skills.git
+git clone https://github.com/MUZEEBURRAHAMAN/design-system-skills.git
 
 # Copy everything into your project
 cp design-system-skills/skills/*.md your-project/.claude/commands/
 cp design-system-skills/rules/*.md your-project/.claude/rules/
+cp design-system-skills/SOURCE-OF-TRUTH.md your-project/   # the policy every skill links to
 ```
 
 Or cherry-pick individual skills:
@@ -83,7 +86,7 @@ cp design-system-skills/rules/accessibility.md your-project/.claude/rules/
 
 See the **[Getting Started Guide](guides/getting-started.md)** for full setup. Three required pieces:
 
-1. **Figma Console MCP** — install the [Figma Console MCP server](https://github.com/nicholasrq/figma-console) and the Desktop Bridge plugin
+1. **Figma Console MCP** — the source of truth; install the [Figma Console MCP server](https://github.com/nicholasrq/figma-console) and the Desktop Bridge plugin
 2. **Storybook** — running on `localhost:6006` (or your configured port)
 3. **Mapping file** — create `.claude/ds-story-figma-map.json` linking your Storybook stories to Figma node IDs
 
@@ -102,7 +105,7 @@ See the **[Getting Started Guide](guides/getting-started.md)** for full setup. T
 # Run a full parity report
 /ds-report
 
-# Sync Storybook to Figma
+# Bring Button's implementation into line with Figma
 /ds-sync Button
 
 # Validate CSS ↔ Figma token parity and generate token map
@@ -126,8 +129,8 @@ See the **[Getting Started Guide](guides/getting-started.md)** for full setup. T
 # Generate google-labs-code/design.md spec-compliant file (YAML front matter + canonical sections + lint)
 /ds-design-md --spec --root
 
-# Generate with Figma typography styles and variable values
-/ds-design-md --figma --root
+# Degraded, code-only fallback (labelled as such)
+/ds-design-md --no-figma --root
 
 # Full Figma-to-Storybook visual parity audit with per-variant diffs
 /ds-audit-figma --variants --themes
@@ -147,40 +150,46 @@ See the **[Getting Started Guide](guides/getting-started.md)** for full setup. T
 # Generate a structured spec for a component
 /ds-spec Button
 
-# Generate specs with Figma write-back
-/ds-spec --figma Button
+# Spec a component that's designed in Figma but not built yet
+/ds-spec RatingStars
 ```
 
 ---
 
 ## Architecture
 
-These skills assume a **three-pillar** design system:
+Figma is the source of truth. The flow only runs one way:
 
 ```
-Code (component library)  →  Storybook (rendered truth)  →  Figma (design mirror)
+Figma Variables, Styles, Components
+        ▼   (read only)
+Machine-readable spec   (ds-spec, ds-design-md, ds-registry)
+        ▼
+React / Storybook implementation
+        ▼
+Automated audit   (ds-audit-figma, ds-report, ds-tokens, ds-wcag) — compares code back against Figma
 ```
 
-**Code is canonical.** Components live in your codebase. Storybook documents their states and variants. Figma mirrors them using bound variables, not hardcoded values.
+**Figma is canonical.** When code/Storybook and Figma disagree, Figma is correct and the finding is "the implementation drifted." Fixes target CSS token files and component source — never a Figma node. A component that exists in Figma but not yet in code is a first-class registry entry (`presence.inCode: false`), not an outlier.
 
-**Claude Code bridges all three.** Via MCP servers, Claude reads your component source, renders and inspects Storybook stories, reads and writes to Figma through the Desktop Bridge, and generates structured specs that write back into Figma.
+**Claude Code bridges them.** Via MCP servers, Claude reads Figma through the Desktop Bridge, renders and inspects Storybook, and proposes or applies code-side fixes. Six guardrails (no Figma writes, no duplicate components, no hard-coded values, no arbitrary overrides, no unapproved architecture changes, Figma-only components are first-class) are in [SOURCE-OF-TRUTH.md](SOURCE-OF-TRUTH.md).
 
-**[Figma Code Connect](guides/code-connect.md)** is optional. It publishes your real component API to Figma's Dev Mode and the MCP server so Claude gets your actual prop names and variant mappings instead of inferring them. All skills work without it.
+**[Figma Code Connect](guides/code-connect.md)** is optional. It records which code implements each Figma component in Dev Mode and the MCP server; Figma's own variant/property definitions stay canonical. All skills work without it.
 
 ### The Mapping File
 
-`.claude/ds-story-figma-map.json` connects every Storybook story to its corresponding Figma node. Without it, every comparison is a guess. See the [Mapping File Guide](guides/mapping-file.md) for how to create one.
+`.claude/ds-story-figma-map.json` connects every Figma component to its Storybook stories. Without it, every comparison is a guess. A section entry with no `sourceFile` is a component designed in Figma and not built yet. See the [Mapping File Guide](guides/mapping-file.md) for how to create one.
 
 ### The DS Registry
 
-On a 50-component DS, each skill run reads ~85 files: barrel exports, component sources, story files, the Figma map, token CSS. The **DS Registry** (`.claude/ds-registry.json`) collapses all of that into a single JSON file. Skills load it in one read. It's generated by a TypeScript script and auto-syncs via a `prestorybook` hook. See the [DS Registry Guide](guides/ds-registry.md) and the [generation script](scripts/generate-ds-registry.ts).
+On a 50-component DS, each skill run reads ~85 files: barrel exports, component sources, story files, the Figma map, token CSS. The **DS Registry** (`.claude/ds-registry.json`) collapses all of that into a single JSON file, enumerated from Figma first and merged with code. Skills load it in one read. It's generated by a TypeScript script and auto-syncs via a `prestorybook` hook. See the [DS Registry Guide](guides/ds-registry.md) and the [generation script](scripts/generate-ds-registry.ts).
 
 ### Drift Scoring
 
 The `/ds-report` skill tracks design system health over time:
 
 ```
-Component Drift % = (1 - fullParityCount / totalUniqueComponents) × 100
+Component Drift % = (1 - fullParityCount / totalUniqueComponents) × 100   (Figma components not yet built count as drift)
 Token Drift %     = (|codeTokens - figmaTokens| / max(codeTokens, figmaTokens)) × 100
 Icon Drift %      = (|codeIcons - figmaIcons| / max(codeIcons, figmaIcons)) × 100
 Overall Drift %   = 60% × Component + 25% × Token + 15% × Icon
@@ -189,6 +198,15 @@ Overall Drift %   = 60% × Component + 25% × Token + 15% × Icon
 Target: **0% drift.** Every run is benchmarked and stored for trend analysis.
 
 ---
+
+## Repository checks
+
+```bash
+npm install
+npm run check    # tsc --strict + source-of-truth rules + fixture tests
+```
+
+Tests cover the registry/presence logic against a fixture project (with a golden file), the snapshot-freshness checker (`scripts/check-snapshot.mjs`), and every source-of-truth rule, each proven by injecting its violation. In your own CI, run `node scripts/check-snapshot.mjs` before `/ds-report --snapshot` (see [CI Integration](guides/ci-integration.md)).
 
 ## Customisation
 
@@ -236,11 +254,11 @@ Default is `localhost:6006`. If your Storybook runs on a different port, update 
 | Tool                                                             | Required For                              | Installation                                     |
 | ---------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------ |
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code)    | All skills                                | `npm install -g @anthropic-ai/claude-code`       |
-| [Figma Console MCP](https://github.com/nicholasrq/figma-console) | Figma sync, audit, report, spec `--figma` | See [Getting Started](guides/getting-started.md) |
+| [Figma Console MCP](https://github.com/nicholasrq/figma-console) | Every skill that reads Figma (sync, tokens, design-md, spec, audit, report) | See [Getting Started](guides/getting-started.md) |
 | [Figma Desktop](https://www.figma.com/downloads/)                | Figma skills                              | Download from Figma                              |
 | [Storybook](https://storybook.js.org/)                           | All skills                                | Part of your project                             |
 | [Figma Code Connect](https://github.com/figma/code-connect)      | Optional: richer MCP context              | `npm install --save-dev @figma/code-connect`     |
-| [design.md CLI](https://github.com/google-labs-code/design.md)   | Optional: lint, diff, export for `--spec` | `npm install --save-dev design.md`               |
+| [design.md CLI](https://github.com/google-labs-code/design.md)   | Optional: lint, diff, export for `--spec` | `npm install --save-dev @google/design.md`               |
 
 ---
 

@@ -4,6 +4,14 @@
     "generatedAt": "2026-03-01T12:00:00.000Z",
     "generatedBy": "scripts/generate-ds-registry.ts",
     "figmaFile": "YOUR_FIGMA_FILE_KEY",
+    "snapshot": {
+      "source": "figma-mapping",
+      "figmaFile": "YOUR_FIGMA_FILE_KEY",
+      "figmaVersion": "FIGMA_FILE_VERSION_AT_REFRESH",
+      "figmaModifiedAt": "2026-01-01T00:00:00.000Z",
+      "figmaMapSha256": "<sha256 of .claude/ds-story-figma-map.json>",
+      "tokenMapSha256": "<sha256 of .claude/ds-token-map.json>"
+    },
     "tokenStats": {
       "primitives": 48,
       "semantic": 92
@@ -12,6 +20,7 @@
   "components": {
     "Button": {
       "name": "Button",
+      "presence": { "inFigma": true, "inCode": true },
       "package": "@acme/ds",
       "sourceFile": "packages/ds/src/components/button/button.tsx",
       "section": "Actions",
@@ -54,6 +63,7 @@
     },
     "Badge": {
       "name": "Badge",
+      "presence": { "inFigma": true, "inCode": true },
       "package": "@acme/ds",
       "sourceFile": "packages/ds/src/components/badge/badge.tsx",
       "section": "Data Display",
@@ -87,6 +97,7 @@
     },
     "Input": {
       "name": "Input",
+      "presence": { "inFigma": true, "inCode": true },
       "package": "@acme/ds",
       "sourceFile": "packages/ds/src/components/input/input.tsx",
       "section": "Forms",
@@ -130,6 +141,20 @@
         "type": "COMPONENT_SET",
         "variantCount": 18,
         "sectionFrameId": "5321:92050"
+      }
+    },
+    "Divider": {
+      "name": "Divider",
+      "presence": { "inFigma": true, "inCode": false },
+      "section": "Layout",
+      "stories": {
+        "variants": ["layout-divider--horizontal", "layout-divider--vertical"]
+      },
+      "figma": {
+        "nodeId": "5321:93010",
+        "type": "COMPONENT_SET",
+        "variantCount": 2,
+        "sectionFrameId": "5321:93000"
       }
     }
   },
@@ -178,13 +203,16 @@
     "custom": ["LogoIcon", "SpinnerIcon"],
     "remix": ["RiSearchLine", "RiCloseLine", "RiArrowDownSLine"]
   },
-  "sections": ["Actions", "Data Display", "Forms"],
+  "sections": ["Actions", "Data Display", "Forms", "Layout"],
   "outliers": {
     "storybookOnly": {
-      "Prototypes": ["DashboardProto", "SettingsProto"]
+      "useDebounce": { "reason": "Hook — no visual Figma counterpart" }
     },
     "figmaOnly": {
-      "Divider": "Exists in Figma but not yet exported from code"
+      "ColorPalette": {
+        "figmaId": "5321:80000",
+        "reason": "Documentation-only frame in Figma, not a real component"
+      }
     }
   }
 }

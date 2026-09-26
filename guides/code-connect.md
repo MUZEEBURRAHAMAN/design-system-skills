@@ -8,7 +8,7 @@ Optional. All skills work without it and improve with it.
 
 ## What Code Connect Does
 
-The Figma MCP server sees a component named "Button" and infers what props it takes from node names. That inference is often wrong. Code Connect replaces the inference with your actual API: the import path, prop names and types, value mappings (Figma's `Type = Primary` maps to `variant="primary"`), and a working code example.
+Figma's component — its variants, properties, and values — is the canonical definition of what a "Button" is (see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md)). Code Connect records how your implementation *maps onto* that definition: the import path, prop names and types, value mappings (Figma's `Type = Primary` maps to `variant="primary"`), and a working code example. It publishes implementation status against Figma; it does not correct or redefine the Figma component. If a mapping can't be written because the code lacks a Figma variant, that's implementation drift to fix in code, not a reason to change the Figma property.
 
 `/ds-sync` compares against real prop mappings. `/ds-proto` composes with your actual API. `/ds-report` can verify Figma variant properties against code props.
 
@@ -119,11 +119,23 @@ figma.connect(Badge, "https://...", {
 });
 ```
 
-### 5. Publish
+### 5. Validate, then (only if you approve) publish
+
+Publishing is the **one** operation in this toolkit that writes into the Figma file (it attaches your code snippets and prop mappings to components in Dev Mode). Under [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) that makes it an explicit, human-approved action — never a side effect of a sync, audit, or CI run.
 
 ```bash
+# 1. Validate mappings locally. Writes nothing to Figma.
+npx figma connect publish --dry-run
+```
+
+Review the dry-run output. Every Figma property/variant name a mapping references must already exist in the Figma component — if one doesn't, **fix the code or the mapping, not Figma**. Then a person runs:
+
+```bash
+# 2. Publish. Only after you've read the dry-run and decided to.
 npx figma connect publish
 ```
+
+Rules for Claude Code and every skill: never run `figma connect publish` on your own initiative or as part of another task; run it only when the user asks for publishing specifically, in that same message, after showing the dry-run result. Publishing may only attach implementation info (code snippets, prop mappings, import paths) — it must never add, rename, or restyle a Figma property, variant, or variable.
 
 ### 6. Verify
 
@@ -168,19 +180,17 @@ This reuses your existing stories as Code Connect examples.
 
 ## CI/CD
 
-Auto-publish on merge to main:
+CI **validates** on every change and never publishes automatically:
 
 ```yaml
-name: Code Connect
+name: Code Connect (validate)
 on:
-  push:
+  pull_request:
     paths:
       - "src/components/**/*.figma.tsx"
-    branches:
-      - main
 
 jobs:
-  publish:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -188,7 +198,33 @@ jobs:
         with:
           node-version: "20"
       - run: npm ci
-      - run: npx figma connect publish
+      - run: npx figma connect publish --dry-run
+        env:
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+```
+
+If you want a scripted publish, make it a manually triggered, reviewer-approved workflow — a person decides when Figma gets written to:
+
+```yaml
+name: Code Connect (publish — manual, approved)
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: figma-publish   # configure required reviewers on this environment
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npx figma connect publish --dry-run
+        env:
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+      - name: Publish (after reviewer approval)
+        run: npx figma connect publish
         env:
           FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
 ```
@@ -199,7 +235,7 @@ jobs:
 
 | Skill | Without Code Connect | With Code Connect |
 |-------|---------------------|-------------------|
-| `/ds-sync` | Compares visuals and token bindings | Also verifies Figma variant properties match code props via published mappings |
+| `/ds-sync` | Compares visuals and token bindings | Also verifies code props cover every Figma variant property, via published mappings; gaps are reported as code drift |
 | `/ds-proto` | Composes from manifest and source code | MCP server provides real component API and examples, reducing hallucinated props |
 | `/ds-report` | Counts components and variants | Can cross-reference Code Connect publication status as a fourth parity dimension |
 | `/ds-audit-figma` | Visual spot-check | Can verify Code Connect coverage alongside visual parity |
