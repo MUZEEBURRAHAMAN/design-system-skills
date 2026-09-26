@@ -456,13 +456,23 @@ interface Registry {
 // 1. Parse barrel exports -> component source paths
 // ---------------------------------------------------------------------------
 
+/**
+ * Follow a barrel export to the files that actually define components.
+ * Handles `export * from "./X"` and named re-exports (`export { A, B } from "./X"`),
+ * and keeps following them through directory index files (`./Button` ->
+ * `Button/index.ts` -> `Button/Button.tsx`) — the common "one folder per
+ * component, each with an index.ts" layout. `export type { ... } from` is
+ * ignored (types aren't components).
+ */
 function parseBarrelExports(
   mainPath: string,
+  seen: Set<string> = new Set(),
 ): Array<{ exportPath: string; resolvedPath: string }> {
-  if (!existsSync(mainPath)) return [];
+  if (!existsSync(mainPath) || seen.has(mainPath)) return [];
+  seen.add(mainPath);
   const source = readFileSync(mainPath, "utf-8");
   const results: Array<{ exportPath: string; resolvedPath: string }> = [];
-  const re = /export\s+\*\s+from\s+["']([^"']+)["']/g;
+  const re = /export\s+(?:\*|\{[^}]*\})\s+from\s+["']([^"']+)["']/g;
   let m = re.exec(source);
   while (m) {
     const relPath = m[1];
@@ -471,7 +481,13 @@ function parseBarrelExports(
     for (const ext of [".tsx", ".ts", "/index.tsx", "/index.ts"]) {
       const full = resolve(base, `${relPath}${ext}`);
       if (existsSync(full)) {
-        results.push({ exportPath: relPath, resolvedPath: full });
+        if (!results.some((r) => r.resolvedPath === full)) {
+          results.push({ exportPath: relPath, resolvedPath: full });
+        }
+        // The target may itself be a barrel: follow its re-exports too.
+        for (const inner of parseBarrelExports(full, seen)) {
+          if (!results.some((r) => r.resolvedPath === inner.resolvedPath)) results.push(inner);
+        }
         break;
       }
     }
