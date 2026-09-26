@@ -1,12 +1,14 @@
 ---
-description: Generate structured component specs — anatomy, API, tokens, structure, and accessibility
+description: Generate structured component specs from the Figma component — anatomy, API, tokens, structure, and accessibility — and check the code implementation against them
 ---
 
 # Design System Spec Generator
 
 Generate comprehensive, structured specification sheets for design system components. Inspired by Uber's uSpec approach — each spec covers anatomy, API surface, token usage, structural measurements, and accessibility semantics in a single pass.
 
-Specs are output as **markdown** (default), **Storybook MDX docs** (`--render`), **structured JSON** (`--json`), and/or **Figma annotations** (`--figma`). The JSON output follows the same conventions as the DS Registry and mapping files — a single self-contained file per component that other skills can consume.
+**Figma is the source of the spec.** Anatomy, variants, properties, states, and token bindings are read from the Figma component (see Phase 0.7 / Phase 1.0); the code implementation is then read and checked *against* that spec, and any difference is recorded as implementation drift — never used to redefine the spec. A component that exists in Figma but has no code yet (`presence.inCode: false` in the registry) still gets a full spec: it's the brief the implementation is built from. See [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md). This skill never writes to Figma.
+
+Specs are output as **markdown** (default), **Storybook MDX docs** (`--render`), and/or **structured JSON** (`--json`). The JSON output follows the same conventions as the DS Registry and mapping files — a single self-contained file per component that other skills can consume.
 
 ## Prerequisites
 
@@ -16,7 +18,7 @@ Specs are output as **markdown** (default), **Storybook MDX docs** (`--render`),
 - `.claude/ds-story-figma-map.json` — Storybook ↔ Figma ID mapping (fallback)
 - `.claude/ds-token-map.json` — CSS property ↔ Figma variable mapping
 - `.claude/rules/accessibility.md` — WCAG 2.1 AA criteria checklist
-- **For `--figma` flag:** Figma Console MCP connected with Desktop Bridge running
+- Figma Console MCP connected with Desktop Bridge running (the spec's source — required; without it the spec is code-derived and must be labelled so, see Phase 0.7)
 - *(Optional)* [Figma Code Connect](https://github.com/figma/code-connect) `.figma.tsx` files — enriches the API section with real Figma ↔ prop mappings
 
 ## Arguments
@@ -26,11 +28,10 @@ Specs are output as **markdown** (default), **Storybook MDX docs** (`--render`),
   - `"Forms"` — generate specs for all form components
   - `--json` — output specs as structured JSON (`.claude/ds-specs/[name].spec.json`)
   - `--render` — output specs as Storybook MDX docs (default: markdown report)
-  - `--figma` — also write spec annotations into the Figma file (requires Figma Console MCP)
   - `--a11y-only` — generate only the accessibility spec section
   - (empty) — generate specs for ALL components
 
-Flags can be combined: `/ds-spec --json --render --figma Button`
+Flags can be combined: `/ds-spec --json --render Button`
 
 ---
 
@@ -52,8 +53,8 @@ Flags can be combined: `/ds-spec --json --render --figma Button`
    | `components[name].stories.path` | Story URL construction |
    | `components[name].stories.variants` | Phase 1.3 — rendered inspection per story variant |
    | `components[name].stories.argTypes` | §2.2 API — control options |
-   | `components[name].figma.nodeId` | `--figma` write-back target |
-   | `components[name].figma.sectionFrameId` | `--figma` annotation frame placement |
+   | `components[name].figma.nodeId` | Phase 1.0 — the Figma component the spec is read from |
+   | `components[name].presence` | `inCode: false` → spec is Figma-only (Phase 1.0); no source/story read |
    | `tokens.primitives` / `tokens.semantic` | §2.3 Token mapping — CSS↔Figma variable cross-ref with hex values |
 
    Skip reading the barrel export, manifest, story-figma mapping, and token map separately — the registry supersedes all of them.
@@ -65,7 +66,7 @@ Flags can be combined: `/ds-spec --json --render --figma Button`
 1. **Read `.claude/ds-token-map.json`** (skip if registry loaded — tokens are already in `registry.tokens`)
 2. **Read `.claude/rules/accessibility.md`** — WCAG 2.1 AA checklist for the accessibility spec section
 3. **Read your token/CSS source files** — semantic token definitions for both themes
-4. **If `--figma` flag:** verify Figma Console MCP is connected by listing available tools. If not connected, warn and fall back to markdown-only output.
+4. Verify Figma Console MCP is connected by listing available tools (see Phase 0.7).
 
 ### 0.3 Load DESIGN.md Context (Optional)
 
@@ -95,13 +96,39 @@ Verify Storybook is running. Determine the URL from one of these sources (in ord
 
 If not running, start it with `/storybook`.
 
+### 0.7 Confirm Figma Is Reachable
+
+The spec is generated from Figma, so confirm the Desktop Bridge responds before doing anything else. If it doesn't, stop and tell the user — don't silently produce a code-derived spec. If the user explicitly wants a code-only draft anyway, generate it but put `> ⚠️ Code-derived draft: not verified against Figma.` at the top of every output file.
+
 ---
 
 ## Phase 1: Component Analysis
 
-For each component, perform a deep read of the source code and rendered output.
+For each component, read the Figma component first (1.0), then the code and rendered output to check it against the Figma-derived spec.
 
-### 1.1 Source Code Read
+### 1.0 Figma Component Read (source of the spec)
+
+Read the component from Figma via `figma_execute`, using `components[name].figma.nodeId` (registry) or `sections[section].components[name].figmaId` (mapping):
+
+```js
+// figma_execute
+const node = await figma.getNodeByIdAsync('COMPONENT_NODE_ID');
+const set = node.type === 'COMPONENT_SET' ? node : null;
+return {
+  name: node.name,
+  type: node.type,
+  description: node.description,
+  variantProperties: set ? set.componentPropertyDefinitions : node.componentPropertyDefinitions,
+  variants: set ? set.children.map(v => ({ name: v.name, w: v.width, h: v.height, padding: [v.paddingTop, v.paddingRight, v.paddingBottom, v.paddingLeft], gap: v.itemSpacing, radius: v.cornerRadius })) : [],
+  children: (set ? set.children[0] : node).children?.map(c => ({ name: c.name, type: c.type })) ?? []
+};
+```
+
+Also read each variant's fills/strokes/text `boundVariables` (see `ds-audit-figma.md` Phase 3.2) so the token table is built from Figma's own bindings. From this read, populate: **§2.1 Anatomy** (child layers), **§2.2 API** (Figma variant properties and their values become the component's intended props), **§2.3 Tokens** (Figma variable bindings per element/state), **§2.4 Structure** (Figma dimensions/padding/gap/radius).
+
+If the registry says `presence.inCode: false`, this is the whole spec — skip 1.1–1.3 and mark the API section "Not yet implemented; implement from the Figma properties above."
+
+### 1.1 Source Code Read (checked against the Figma spec)
 
 Read the component's source file (from registry `components[name].sourceFile` or manifest). Extract:
 
@@ -170,7 +197,7 @@ If the mapping file contains **verify screen** IDs for the component's section (
 1. Capture the Storybook screenshot via `preview_screenshot`
 2. Capture the Figma verify frame via `figma_capture_screenshot`
 3. Compare dimensions, spacing, and colour accuracy between the two renders
-4. Use any discrepancies to correct the Structure section (§2.4) — prefer Storybook computed values as canonical
+4. Record any discrepancies in the `drift[]` list (Structure section §2.4) as implementation drift — the Figma values stay in the spec; never overwrite them with Storybook's computed values
 
 ---
 
@@ -595,31 +622,9 @@ import { Meta } from "@storybook/blocks";
 
 Place the MDX files next to the corresponding story files (path from registry `components[name].stories.file`).
 
-### 3.4 Figma Annotations (`--figma`)
+### 3.4 No Figma Write-Back
 
-When `--figma` is passed and Figma Console MCP is connected:
-
-1. Navigate to the component's Figma node (from registry `components[name].figma.nodeId` or mapping `sections[section].components[name].figmaId`)
-2. Create a spec frame adjacent to the component using `figma_execute`, placed near the `sectionFrameId`
-3. Populate the frame with:
-   - Anatomy table with numbered markers
-   - Token table with variable references (bind color swatches to Figma variables using `figmaVarId` from the spec JSON)
-   - Structure measurements
-   - Accessibility notes
-4. Use Figma text styles matching the DS typography
-
-**Figma spec frame structure:**
-
-```
-SPEC: [ComponentName]
-+-- Anatomy (section with table)
-+-- API Summary (key props only)
-+-- Token Map (color swatches + variable names)
-+-- Structure (dimension callouts)
-+-- Accessibility (ARIA roles, keyboard shortcuts, screen reader text)
-```
-
-Use `figma_execute` to create frames, text nodes, and rectangles. Bind colours to Figma variables where applicable. This is the write-back capability — spec documentation lives directly in the Figma file alongside the component.
+Specs are never written into the Figma file. Figma is the source the spec is read from, so writing generated content back into it would let a code-derived artifact edit the design file (Guardrail 1, SOURCE-OF-TRUTH.md). If a team wants spec documentation visible in Figma, a designer adds it there by hand, or uses Code Connect / Dev Mode annotations (`guides/code-connect.md`) to publish *implementation status* next to the component.
 
 ---
 
@@ -636,7 +641,7 @@ Present the user with:
 **Output:** `.claude/ds-specs/` ([N] files)
 **JSON specs:** [Yes/No] ([N] .spec.json files)
 **Storybook docs:** [Yes/No] ([N] MDX files)
-**Figma annotations:** [Yes/No] ([N] spec frames)
+**Source:** Figma ([N] components read live) / code-derived draft (labelled)
 
 ### Highlights
 
@@ -664,8 +669,9 @@ After writing all outputs, update the spec index (`.claude/ds-specs/index.json`)
 
 ## Key Rules
 
+0. **Figma is the spec's source; code is checked against it.** Never edit the spec to match the implementation, and never write to Figma.
 1. **Single pass** — read the source once, generate all six sections from that read. Do not re-read between sections.
-2. **Token verification** — every colour must trace back to a CSS custom property and (if mapped) a Figma variable. Use `figmaVarId` from the registry or token map. Flag hardcoded values.
+2. **Token verification** — every colour must trace back to a Figma variable binding first, then the CSS custom property that should match it. Use `figmaVarId` from the registry or token map. Flag hardcoded values.
 3. **Contrast calculation** — use the WCAG 2.0 relative luminance formula. Check both themes.
 4. **Registry-first** — always prefer the registry over individual file reads. The registry field→section mapping in Phase 0.1 is the canonical reference.
 5. **Incremental** — if a spec already exists at `.claude/ds-specs/[name].md` or `.spec.json`, update it rather than overwriting (preserve any manual annotations in markdown; merge into existing JSON).
@@ -691,14 +697,11 @@ After writing all outputs, update the spec index (`.claude/ds-specs/index.json`)
 # Generate specs with Storybook doc pages
 /ds-spec --render Button
 
-# Generate specs with Figma annotations (requires Figma Console MCP)
-/ds-spec --figma Button
-
 # Only the accessibility section
 /ds-spec --a11y-only Dialog
 
 # All output formats at once
-/ds-spec --json --render --figma
+/ds-spec --json --render
 
 # JSON specs for all components (feeds into ds-report coverage)
 /ds-spec --json
