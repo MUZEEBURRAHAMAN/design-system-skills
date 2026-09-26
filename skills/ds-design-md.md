@@ -16,7 +16,7 @@ Generate a `DESIGN.md` file from your existing design system data — Figma vari
 ## Arguments
 
 - `$ARGUMENTS` — optional flags:
-  - `--no-figma` — skip the live Figma read and generate from code sources only. This is a **degraded fallback**, not the normal path — the output is labelled as code-only so nobody mistakes it for a Figma-verified DESIGN.md
+  - `--no-figma` — skip the live Figma read and generate from code-side sources alone. This is a **degraded fallback**, not the normal path — the output is labelled as code-only so nobody mistakes it for a Figma-verified DESIGN.md
   - `--update` — update an existing DESIGN.md, preserving manually written sections
   - `--root` — write to project root `DESIGN.md` instead of `.claude/DESIGN.md` (default)
   - `--spec` — output a [google-labs-code/design.md](https://github.com/google-labs-code/design.md) compliant file: YAML front matter with machine-readable tokens + markdown body in the canonical section order. Compatible with `design.md lint`, `design.md diff`, and `design.md export`.

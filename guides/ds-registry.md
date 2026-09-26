@@ -273,7 +273,7 @@ Otherwise:
 
 The registry provides the complete component inventory, story metadata, and Figma mapping in one read. Phase 1 (Collect Inventories) shrinks from ~40 file reads to 1 registry read + 1 Figma API call.
 
-### `/ds-sync` (Storybook-to-Figma Sync)
+### `/ds-sync` (Figma-to-Code Sync)
 
 Phase 1 loads the token map, component metadata, and Figma node IDs from the registry instead of reading the barrel export, each component source, the mapping file, and the token CSS files separately.
 

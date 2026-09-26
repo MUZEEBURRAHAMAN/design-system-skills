@@ -1,6 +1,6 @@
 # Design System Skills for Claude Code (Figma-first fork)
 
-> **This fork changes the source of truth.** Upstream is code-first ("Code is canonical, Storybook wins"). Here, **Figma is canonical**: Variables/Styles/Components → spec → implementation → audit. Skills read Figma and never write to it. Read [SOURCE-OF-TRUTH.md](SOURCE-OF-TRUTH.md) — it's short, and every skill follows it. Forked from [NewMediaStudio/design-system-skills](https://github.com/NewMediaStudio/design-system-skills) (MIT).
+> **This fork changes the source of truth.** Upstream is code-first (its README says code wins any disagreement). Here, **Figma is canonical**: Variables/Styles/Components → spec → implementation → audit. Skills read Figma and never write to it. Read [SOURCE-OF-TRUTH.md](SOURCE-OF-TRUTH.md) — it's short, and every skill follows it. Forked from [NewMediaStudio/design-system-skills](https://github.com/NewMediaStudio/design-system-skills) (MIT).
 
 Open-source [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code) for managing a design system whose source of truth is **Figma**, implemented in **Code** and documented in **Storybook**. Run accessibility audits, bring code into line with Figma, track drift, and prototype from the terminal.
 
@@ -39,7 +39,7 @@ Open-source [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code)
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | **[Getting Started](guides/getting-started.md)**               | End-to-end setup: Figma MCP, Storybook, mapping file, and your first sync                        |
 | **[DS Registry](guides/ds-registry.md)**                       | Unified JSON registry — one file for all component, story, Figma, and token metadata             |
-| **[Mapping File](guides/mapping-file.md)**                     | How to create and maintain the Storybook-to-Figma mapping JSON                                   |
+| **[Mapping File](guides/mapping-file.md)**                     | How to create and maintain the Figma-to-Storybook mapping JSON                                   |
 | **[Code Connect](guides/code-connect.md)**                     | Optional: link production components to Figma Dev Mode and the MCP server via Figma Code Connect |
 | **[CI Integration](guides/ci-integration.md)**                 | Run DS skills in CI — WCAG gates, drift thresholds, shadow copy detection, and PR comments       |
 | **[Component Versioning](guides/component-versioning.md)**     | Semantic versioning for DS components, codemods, deprecation notices, and migration guides       |

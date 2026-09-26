@@ -69,6 +69,8 @@ If `.claude/ds-registry.json` exists, load it as the primary discovery source (s
 
 If the registry does not exist, fall back to the individual file reads described below.
 
+**Figma-first constraint:** prototype only with components that exist in code (`presence.inCode: true`). A component that's designed in Figma but not built yet (`inCode: false`) is not available — note it as a gap for the user rather than inventing a local stand-in (Guardrail 2, SOURCE-OF-TRUTH.md).
+
 ### 1.1 Load Component Inventory
 
 1. **Read `design-system-manifest.json`** — full component inventory with props, argTypes, and variants

@@ -147,7 +147,7 @@ For the component's default and key variant states:
 4. Repeat for dark theme (reload story with `&globals=theme:dark`)
 
 **Token-level check (if Figma connected):**
-If the Figma Desktop Bridge is available, also cross-reference the Storybook computed colors against Figma variable bindings to ensure the Figma component uses the same tokens.
+If the Figma Desktop Bridge is available, also cross-reference the Storybook computed colors against Figma's variable bindings (the reference) and flag any place the implementation uses a different token than Figma binds — that's a code fix, never a Figma change.
 
 ---
 
