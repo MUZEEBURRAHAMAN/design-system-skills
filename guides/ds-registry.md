@@ -2,6 +2,8 @@
 
 The DS Registry is a single JSON file (`.claude/ds-registry.json`) that combines component metadata, Storybook stories, Figma mappings, and token data into one file every skill can read.
 
+**Figma-first:** the registry is built by enumerating Figma's sections/components *first*, then merging in code. A component that exists in Figma but has no implementation yet still gets a full entry — `presence: { inFigma: true, inCode: false }` — not a footnote. See [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) Guardrail 6.
+
 **Time estimate:** 15 minutes to set up generation, then fully automatic.
 
 ---
@@ -10,10 +12,10 @@ The DS Registry is a single JSON file (`.claude/ds-registry.json`) that combines
 
 Each skill (`/ds-sync`, `/ds-report`, `/ds-proto`) reads multiple files to build context:
 
-1. **Barrel export** (`src/main.tsx`) to discover components
-2. **Each component source file** to extract CVA variants, props, tokens, Radix primitives
-3. **Each story file** to find Storybook story names and argTypes
-4. **Figma mapping file** (`.claude/ds-story-figma-map.json`) to look up Figma node IDs
+1. **Figma mapping file** (`.claude/ds-story-figma-map.json`) to discover the component set as Figma knows it, including anything not yet built
+2. **Barrel export** (`src/main.tsx`) to cross-reference which of those are implemented, and find any code-only component with no Figma section
+3. **Each component source file** to extract CVA variants, props, tokens, Radix primitives
+4. **Each story file** to find Storybook story names and argTypes
 5. **Token map** (`.claude/ds-token-map.json`) to cross-reference CSS tokens with Figma variables
 6. **Design system manifest** (`design-system-manifest.json`) for icon inventory
 
@@ -61,20 +63,21 @@ Generation metadata and global identifiers.
 
 ### `components`
 
-A flat object keyed by PascalCase component name. Each entry:
+A flat object keyed by PascalCase component name — the name is stable identity; it comes from whichever side (Figma or code) knows about the component. Each entry:
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | `string` | Component name (matches the key) |
-| `package` | `string` | Package name (e.g., `@acme/ds`) |
-| `sourceFile` | `string` | Relative path to the component source file |
+| `presence` | `{ inFigma: boolean, inCode: boolean }` | Whether the component actually exists on each side. `{inFigma:true, inCode:false}` is a real component pending implementation. `{inFigma:false, inCode:true}` was built without a Figma source — worth a second look under a Figma-first policy. |
 | `section` | `string` | Storybook/Figma section (e.g., `"Actions"`, `"Forms"`) |
-| `variants` | `Record<string, string[]>?` | CVA variant keys and their options |
+| `package` | `string?` | Package name (e.g., `@acme/ds`) — absent when `presence.inCode` is false |
+| `sourceFile` | `string?` | Relative path to the component source file — absent when `presence.inCode` is false |
+| `variants` | `Record<string, string[]>?` | CVA variant keys and their options (code-derived) |
 | `defaultVariants` | `Record<string, string>?` | CVA default variant values |
 | `props` | `Record<string, string>?` | Interface props (name to TypeScript type) |
 | `tokens` | `string[]?` | Semantic tokens referenced in component source |
 | `radixPrimitives` | `string[]?` | Radix UI primitives used (e.g., `["slot", "dialog"]`) |
-| `stories` | `object?` | `{ file, path, variants, argTypes? }` |
+| `stories` | `object?` | `{ file?, path?, variants, argTypes? }` — `file`/`path` are absent when the stories are only pre-named in the Figma mapping file, not yet implemented |
 | `figma` | `object?` | `{ nodeId, type, variantCount?, sectionFrameId? }` |
 
 ### `tokens`
@@ -101,23 +104,24 @@ Sorted array of all section names found across components (e.g., `["Actions", "D
 
 ### `outliers`
 
-Components that exist in only one pillar (Storybook-only or Figma-only), pulled from the mapping file.
+**Not where a not-yet-built component lives** — that's a normal `components` entry with `presence.inCode: false` (see above). `outliers` is only for *permanent, documented* exceptions pulled straight from the mapping file's own `storybookOnly`/`figmaOnly` keys: things that were never meant to have a counterpart on the other side (a hook with no visual form, a documentation-only Figma frame like a color-swatch sheet).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `storybookOnly` | `Record<string, string[]>` | Section name to array of component names |
-| `figmaOnly` | `Record<string, string>` | Component name to description/note |
+| `storybookOnly` | `Record<string, { reason: string }>` | Code export name → why it has no Figma counterpart by design |
+| `figmaOnly` | `Record<string, { figmaId?: string, reason: string }>` | Figma node name → why it has no code counterpart by design |
 
 ---
 
 ## Example Entry
 
-Here is a genericised example of a Button component in the registry:
+A component built on both sides:
 
 ```json
 {
   "Button": {
     "name": "Button",
+    "presence": { "inFigma": true, "inCode": true },
     "package": "@acme/ds",
     "sourceFile": "packages/ds/src/components/button/button.tsx",
     "section": "Actions",
@@ -143,6 +147,27 @@ Here is a genericised example of a Button component in the registry:
       "type": "COMPONENT_SET",
       "variantCount": 48,
       "sectionFrameId": "5321:90953"
+    }
+  }
+}
+```
+
+A component designed in Figma but not yet implemented — a real, actionable entry, not a footnote:
+
+```json
+{
+  "DatePicker": {
+    "name": "DatePicker",
+    "presence": { "inFigma": true, "inCode": false },
+    "section": "Forms",
+    "stories": {
+      "variants": ["forms-datepicker--default", "forms-datepicker--range"]
+    },
+    "figma": {
+      "nodeId": "5321:91204",
+      "type": "COMPONENT_SET",
+      "variantCount": 6,
+      "sectionFrameId": "5321:90980"
     }
   }
 }
@@ -264,14 +289,14 @@ The generation script reads these source files and merges them:
 
 | Source | What It Extracts |
 |--------|-----------------|
-| **Barrel export** (`main.tsx`) | Component names and source file paths |
+| **Figma mapping** (`.claude/ds-story-figma-map.json`) | The base component list (every name in every section), Figma node IDs, types, variant counts, section frame IDs, pre-named stories for not-yet-built components |
+| **Barrel export** (`main.tsx`) | Component names and source file paths — merged into the Figma-seeded list, or added new for a code-only component |
 | **Component source files** (`.tsx`) | CVA variants, default variants, interface props, Tailwind token references, Radix primitives |
 | **Story files** (`.stories.tsx`) | Story title, section, exported story names, argTypes |
-| **Figma mapping** (`.claude/ds-story-figma-map.json`) | Figma node IDs, types, variant counts, section frame IDs |
 | **Token map** (`.claude/ds-token-map.json`) | Primitive and semantic token cross-references |
 | **Manifest** (`design-system-manifest.json`) | Icon inventory |
 
-All sources except the barrel export and component files are optional. If a file is missing, the script omits that section from the registry.
+Only the barrel export and component source files are required for the script to run at all (an empty Figma map still lets it build a code-only registry, with every entry showing `presence.inFigma: false`). Every other source is optional; a missing file just omits that data, not the whole entry.
 
 ---
 
@@ -310,4 +335,8 @@ The registry is a **generated artifact**. To keep it accurate:
 ### Figma data missing
 
 - Verify `.claude/ds-story-figma-map.json` exists and has the correct structure
-- Component names in the Figma map must match the barrel export names exactly (PascalCase)
+- A Figma-mapped component does **not** need a matching barrel export — a `presence.inCode: false` entry is expected and correct for anything not yet built. If a component you *have* implemented shows `inCode: false`, check that its code export name matches the Figma map's component name exactly (PascalCase).
+
+### A component I know is in Figma isn't showing up at all
+
+- Confirm it's listed under `sections[sectionName].components`, not under the top-level `figmaOnly` key — `figmaOnly` is only for permanent exceptions (documentation frames, etc.) and intentionally does not produce a `components` entry. A real, not-yet-built component belongs in a section.

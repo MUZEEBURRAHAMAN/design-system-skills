@@ -1,6 +1,6 @@
 # The Mapping File
 
-`.claude/ds-story-figma-map.json` connects every Storybook story to its corresponding Figma node. Every comparison and every sync write targets the exact right place because of this file.
+`.claude/ds-story-figma-map.json` connects every Figma component to its corresponding Storybook story. Every comparison, and every code-side fix `/ds-sync` proposes, targets the exact right place because of this file. **A section entry with no `sourceFile` is a real component — designed in Figma, not yet built — not an error in the mapping.** See [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md).
 
 ---
 
@@ -76,8 +76,8 @@ Group components by their Figma section/frame. Each section has:
 | `figmaId` | The Figma node ID of the component or component set |
 | `figmaType` | `COMPONENT_SET` (has variants), `COMPONENT` (single), or `FRAME` (composite) |
 | `variantCount` | Number of Figma variants (children of a `COMPONENT_SET`) |
-| `stories` | Array of Storybook story IDs (the `id` field from Storybook's index) |
-| `sourceFile` | Relative path to the component source file |
+| `stories` | Array of Storybook story IDs (the `id` field from Storybook's index) if built, or pre-named intended story IDs if not built yet |
+| `sourceFile` | *(optional)* Relative path to the component source file. **Omit this field entirely for a component that's designed in Figma but not yet implemented** — the registry generator gives it a full entry with `presence.inCode: false` instead of silently dropping it. |
 
 ---
 
@@ -106,15 +106,17 @@ Use Claude with the Figma Console MCP:
 
 ### Auto-Discovery
 
-You can ask Claude to help build the mapping:
+You can ask Claude to help build the mapping. Figma is the anchor — enumerate it first, so a component Figma knows about but Storybook doesn't yet still ends up in the mapping:
 
 ```
-> My Storybook is running on localhost:6006 and my Figma file is open.
+> My Figma file is open and my Storybook is running on localhost:6006.
 > Help me build a ds-story-figma-map.json by:
-> 1. Fetching the Storybook index to get all story IDs
-> 2. Enumerating the Figma page structure to get component node IDs
+> 1. Enumerating the Figma page structure to get every section and component node ID
+> 2. Fetching the Storybook index to get story IDs for the ones that are built
 > 3. Matching them by name similarity
-> 4. Writing the mapping file
+> 4. For any Figma component with no Storybook match, add it anyway — omit
+>    `sourceFile`, leave `stories` empty or pre-name the stories you expect
+> 5. Writing the mapping file
 ```
 
 ---
@@ -123,9 +125,11 @@ You can ask Claude to help build the mapping:
 
 ### When to Update
 
-- **New component added** — add its Figma ID and story IDs
+- **New component designed in Figma** — add its section entry (`figmaId`, `figmaType`, `variantCount`) right away, even with no `sourceFile` and no `stories` yet. This is what makes it show up as a real, actionable registry entry instead of being invisible until someone remembers to add it after the fact.
+- **Component implemented** — add `sourceFile` and the real `stories` array to its existing entry
 - **Component renamed** — update the component key and story IDs
-- **Component deleted** — remove from mapping, or move to `storybookOnly`/`figmaOnly`
+- **Component permanently retired from one side only** (a hook with no visual form, a documentation-only Figma frame) — move it to `storybookOnly`/`figmaOnly`. Don't use these for a component that's simply not built yet on the other side; that's a normal section entry.
+- **Component deleted from both** — remove it from the mapping entirely
 - **Figma restructured** — node IDs change when components are deleted and recreated; re-enumerate
 - **Story IDs changed** — happens when you rename the `title` in story meta
 
@@ -146,7 +150,7 @@ The `/ds-sync` skill uses these for pixel-level comparison against Storybook scr
 
 ---
 
-## Example Workflow
+## Example Workflow: A Component Already Built on Both Sides
 
 1. You add a new `DatePicker` component to your library
 2. You create a Storybook story with variants (default, with value, disabled, error)
@@ -168,6 +172,20 @@ The `/ds-sync` skill uses these for pixel-level comparison against Storybook scr
    ```
 5. Run `/ds-sync DatePicker` to verify alignment
 6. Run `/ds-report` to update the drift score
+
+## Example Workflow: A Component Designed in Figma, Not Yet Built (the Figma-first case)
+
+1. A designer builds a new `RatingStars` component in Figma with 3 variants
+2. You (or Claude) enumerate the Figma page and add the mapping immediately — before any code exists:
+   ```json
+   "RatingStars": {
+     "figmaId": "9876:5432",
+     "figmaType": "COMPONENT_SET",
+     "variantCount": 3
+   }
+   ```
+3. Run `pnpm ds:registry` — `RatingStars` now appears in `.claude/ds-registry.json` with `presence: { inFigma: true, inCode: false }`, ready to drive an implementation (`/ds-spec RatingStars` reads its anatomy/variants straight from Figma)
+4. Once it's built, add `sourceFile` and `stories` to the same mapping entry — `presence.inCode` flips to `true` on the next registry run
 
 ---
 
