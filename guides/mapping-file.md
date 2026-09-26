@@ -54,6 +54,7 @@
 | Field | Description |
 |-------|-------------|
 | `figmaFile` | The Figma file key from the URL (`figma.com/design/<KEY>/...`) |
+| `figmaVersion` / `figmaModifiedAt` | The Figma file's `version` and `lastModified` when this mapping was refreshed (Figma REST `GET /v1/files/:key`, or the Figma Console MCP file tools). `scripts/check-snapshot.mjs` requires one of them — it's how the snapshot is proven fresh against live Figma |
 | `storybookBase` | URL template for loading stories. `{storyId}` and `{theme}` are placeholders |
 | `semanticCollection` | Figma Variable Collection ID for your semantic tokens |
 | `lightMode` | Mode ID for the light theme in that collection |

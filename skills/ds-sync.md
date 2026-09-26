@@ -1,10 +1,10 @@
 ---
-description: Pull your Figma Design System into Storybook via visual benchmarking and token mapping, and propose code-side corrections — never writes to Figma
+description: Pull your Figma Design System into Storybook via visual benchmarking and token mapping, and propose code-side corrections (applied only with your explicit approval) — never writes to Figma
 ---
 
 # Design System Sync
 
-Bring your live Storybook component library into alignment with your Figma Design System file. The workflow renders each component, compares it to its Figma counterpart, extracts token/prop context, and proposes corrections to your CSS token files and component source. Figma is the source of truth here — see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) — so this skill never writes to a Figma node, under any flag or condition.
+Bring your live Storybook component library into alignment with your Figma Design System file. The workflow renders each component, compares it to its Figma counterpart, extracts token/prop context, and proposes corrections to your CSS token files and component source — as a reviewable report first; nothing in your code changes unless you explicitly approve it. Figma is the source of truth here — see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) — so this skill never writes to a Figma node, under any flag or condition.
 
 ## Prerequisites
 
@@ -22,6 +22,7 @@ Bring your live Storybook component library into alignment with your Figma Desig
   - `Button` — standard sync for Button only
   - `--precision Button` — precision 1:1 per-variant audit for Button
   - `--precision` — precision audit for ALL components (slow)
+  - `--apply-tokens` — after Phase 4.1 shows the exact token-file diff, apply it **only if the user explicitly approves that specific list in chat**. Without this flag nothing in code is ever changed by this skill
   - `"Data Display"` — standard sync for a section
   - (empty) — standard sync for ALL components
 
@@ -118,7 +119,7 @@ return matches;
 
 If exactly one match is found, update the mapping entry and continue. If zero or multiple matches are found, require manual resolution.
 
-**If the mapping file is absent**, regenerate it by fetching Storybook's `/index.json` and traversing the Figma page children. Save the updated mapping back to `.claude/ds-story-figma-map.json`.
+**If the mapping file is absent**, regenerate it by fetching Storybook's `/index.json` and traversing the Figma page children. Save the updated mapping back to `.claude/ds-story-figma-map.json`, and record the Figma file's current `version` and `lastModified` in `_meta.figmaVersion` / `_meta.figmaModifiedAt` (from the Figma REST API `GET /v1/files/:key`, or the Figma Console MCP's file-data/version tools). `scripts/check-snapshot.mjs` uses them to prove the snapshot is fresh.
 
 ### 1.2 Build the Token Translation Map
 
@@ -277,17 +278,22 @@ Compare Storybook tokens against Figma bindings. For each discrepancy, record:
 
 Figma is correct. A DRIFT or MISMATCH means the *implementation* has drifted — every fix in this phase targets a CSS token file or a component source file. This skill never writes to a Figma node, under any flag or condition (Guardrail 1, SOURCE-OF-TRUTH.md).
 
-### 4.1 Token Corrections (may be applied directly)
+### 4.1 Token Corrections (proposal by default)
 
-For each DRIFT or MISSING token, the fix is narrow and traceable — a single CSS custom property's value should equal Figma's resolved value for that variable. This is safe to apply directly (Edit the token file):
+For each DRIFT or MISSING token, the fix is narrow and traceable — a single CSS custom property's value should equal Figma's resolved value for that variable. Write each one into the report as an exact, ready-to-apply diff:
 
-1. Look up the correct resolved value from Figma via the token translation map (already read in Phase 3.2 — never invent a value from a screenshot; Guardrail 4)
-2. Edit the CSS custom property in the token file (e.g., `src/styles/tokens.css` or `src/styles/colors.css`) to match:
-   ```css
-   /* was: --stroke-input: #e2e2e2; */
-   --stroke-input: #d9dce1; /* now matches Figma variable stroke-input */
-   ```
-3. Record every change in the report (Phase 5) — never a silent edit.
+```css
+/* src/styles/tokens.css — proposed */
+- --stroke-input: #e2e2e2;
++ --stroke-input: #d9dce1; /* matches Figma variable stroke-input (Light) */
+```
+
+1. Take the value from the resolved Figma variable read in Phase 3.2 — never from a screenshot (Guardrail 4)
+2. List every proposed token change with its Figma variable name/ID, the current CSS value, and the Figma value
+3. **Do not edit any file** unless the run was invoked with `--apply-tokens` *and* the user then explicitly approves the listed changes in chat. Approval covers only the changes shown; anything new discovered later is a new proposal
+4. If approved: edit only those CSS custom-property values, record each applied change in the report, and never touch anything else
+
+Code is never treated as the design authority: an unapproved run leaves the working tree exactly as it found it.
 
 ### 4.2 Spacing, Dimension & Structural Fixes (proposal only — never auto-applied)
 
@@ -299,11 +305,11 @@ A padding/gap/radius/structural difference usually means a component's source ne
 
 ### 4.3 Review & Confirm
 
-After Phase 4.1's direct token edits:
+Only if `--apply-tokens` was approved and applied in Phase 4.1:
 
 1. Re-render the affected Storybook stories
 2. Re-extract computed CSS and compare against the same Figma values used in 4.1 to verify the fix actually landed
-3. Report the result, alongside every unapplied proposal from 4.2
+3. Report the result, alongside every unapplied proposal from 4.1 and 4.2
 
 ---
 
@@ -312,7 +318,7 @@ After Phase 4.1's direct token edits:
 ### 5.1 Per-Component Summary
 
 ```markdown
-| Component | Light | Dark | Tokens Fixed | Proposed (needs confirmation) |
+| Component | Light | Dark | Token fixes applied (approved) | Proposed (not applied) |
 |-----------|-------|------|--------------|-------------------------------|
 | Button    | MATCH | MATCH| 0            | 0                              |
 | Input     | DRIFT | DRIFT| 3 tokens     | 1 structural fix (Phase 4.2)   |
@@ -326,7 +332,7 @@ After Phase 4.1's direct token edits:
 |----------------------------|-------|--------|
 | Total properties audited   | 240   | —      |
 | Correctly token-bound      | 228   | 95%    |
-| Fixed in code this run     | 8     | +3.3%  |
+| Applied in code (approved) | 8     | +3.3%  |
 | Still hardcoded in code    | 4     | Review |
 ```
 
@@ -377,7 +383,7 @@ This is slow but catches every discrepancy at the variant level.
 
 1. **Never write to Figma** — no flag, mode, or precision level in this skill writes to a Figma node. Read access (`figma_execute`, `figma_get_variables`, `figma_capture_screenshot`) is unrestricted; write access isn't part of this skill's job.
 2. **Figma is canonical** — when Storybook/code and Figma disagree, Figma is correct. The finding is "the implementation has drifted," never "the design file is stale."
-3. **Token corrections may be applied directly** (Phase 4.1) — narrow, single-property, always traced to a real Figma variable value. **Structural/spacing fixes are proposals only** (Phase 4.2) — always confirmed by a person before touching a component's source.
+3. **Everything is a proposal by default.** Token-value corrections (Phase 4.1) can be applied only with `--apply-tokens` plus explicit in-chat approval of the exact list; structural/spacing fixes (Phase 4.2) are proposals a person applies themselves or approves one by one. An unapproved run changes nothing in code.
 4. **Never invent a value** — a proposed or applied fix always traces to a resolved Figma variable/style value, never a number guessed from a screenshot diff (Guardrail 4).
 5. **Log everything** — every change, applied or proposed, is recorded in the report.
 6. **No destructive changes** — components are updated, never deleted, on either side.

@@ -199,6 +199,15 @@ Target: **0% drift.** Every run is benchmarked and stored for trend analysis.
 
 ---
 
+## Repository checks
+
+```bash
+npm install
+npm run check    # tsc --strict + source-of-truth rules + fixture tests
+```
+
+Tests cover the registry/presence logic against a fixture project (with a golden file), the snapshot-freshness checker (`scripts/check-snapshot.mjs`), and every source-of-truth rule, each proven by injecting its violation. In your own CI, run `node scripts/check-snapshot.mjs` before `/ds-report --snapshot` (see [CI Integration](guides/ci-integration.md)).
+
 ## Customisation
 
 Adapt these skills to your project. Common changes:

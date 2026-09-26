@@ -16,7 +16,7 @@ Run a read-only audit across all three pillars of the design system — **Figma 
 ## Arguments
 
 - `$ARGUMENTS` — optional section filter (e.g., `Selection`, `Layout`). If omitted, audits ALL sections.
-- `--snapshot` — for CI, where Figma Desktop isn't available: skip every live Figma call and use the committed Figma-derived artifacts (`.claude/ds-registry.json`, `.claude/ds-token-map.json`) as the Figma reference. The report header must say "against Figma snapshot generated <`_meta.generatedAt`>" so nobody mistakes it for a live read. Requires the registry; if it's missing, stop rather than guess.
+- `--snapshot` — for CI, where Figma Desktop isn't available: skip every live Figma call and use the committed Figma-derived artifacts (`.claude/ds-registry.json`, `.claude/ds-token-map.json`) as the Figma reference. The report header must say "against Figma snapshot generated <`_meta.generatedAt`>" so nobody mistakes it for a live read. Before reading anything, run `node scripts/check-snapshot.mjs` (add `--figma-modified`/`--figma-version` when a live value is available). If it fails — stale, unversioned, or inconsistent snapshot — stop and report why instead of comparing code against untrustworthy design data. Requires the registry; if it's missing, stop rather than guess.
 
 ---
 

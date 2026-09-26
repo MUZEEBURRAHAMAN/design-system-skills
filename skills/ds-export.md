@@ -24,7 +24,7 @@ Convert the YAML front matter in `DESIGN.md` to token formats consumed by other 
 
 Read `DESIGN.md` from the project root, or `.claude/DESIGN.md` if root file is absent.
 
-Parse the YAML front matter. If front matter is missing, stop and prompt the user to regenerate with `/ds-design-md --spec`.
+Check the `<!-- ds-source: ... -->` provenance comment at the top of DESIGN.md. If it says `code-fallback` or is missing, warn that these exports aren't verified against Figma, and stop unless the user confirms. Then parse the YAML front matter. If front matter is missing, stop and prompt the user to regenerate with `/ds-design-md --spec`.
 
 Validate that `colors.primary` and `typography.fontFamily` exist — these are required by all downstream formats.
 

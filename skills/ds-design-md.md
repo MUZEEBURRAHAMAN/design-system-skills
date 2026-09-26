@@ -85,7 +85,7 @@ Only under `--no-figma`, fall back to reading CSS for font declarations instead:
 
 ### 1.5 Load Existing Design Context
 
-Check for `.claude/proto-decisions.md` — extract any established design principles, rejected defaults, or layout decisions recorded during prior prototyping sessions. These become the "Design Guidelines" section.
+Check for `.claude/proto-decisions.md` — extract any established design principles, rejected defaults, or layout decisions recorded during prior prototyping sessions. These become the "Design Guidelines" section, each labelled `(prototype-derived, pending design review)` unless a designer has confirmed it — prototype decisions are implementation choices, not design authority.
 
 Check for an existing `DESIGN.md` or `.claude/DESIGN.md` (relevant for `--update` mode).
 
@@ -204,7 +204,7 @@ Map to semantic usage:
 
 ## Phase 7: Generate DESIGN.md
 
-Assemble all extracted data into the standard DESIGN.md format. The file is designed to be read by AI agents as persistent context — keep it scannable, specific, and free of filler. If `--no-figma` was used, add a one-line notice right under the title: `> ⚠️ Generated with --no-figma: code sources only, not verified against Figma.` Omit it entirely when Figma was read successfully.
+Assemble all extracted data into the standard DESIGN.md format. The file is designed to be read by AI agents as persistent context — keep it scannable, specific, and free of filler. Put a machine-readable provenance comment as the very first line: `<!-- ds-source: figma-live; figmaFile: FIGMA_FILE_KEY; generatedAt: 2026-09-26T00:00:00.000Z -->` (`figma-live` only when Figma was actually read this run). Under `--no-figma` write `<!-- ds-source: code-fallback -->` instead, and add a one-line notice right under the title: `> ⚠️ Generated with --no-figma: code sources only, not verified against Figma.` Omit it entirely when Figma was read successfully.
 
 ```markdown
 # DESIGN.md
@@ -443,7 +443,7 @@ The linter checks for:
 - Orphaned tokens (defined in front matter but never referenced in the body)
 - Section ordering violations against the canonical order
 
-Report violations to the user. For contrast failures, suggest adjusted hex values that pass 4.5:1. For structural issues, correct and re-lint before finalising the file.
+Report violations to the user. For contrast failures, do **not** change any value in DESIGN.md — it must keep Figma's values. List each failing pair with its ratio and a passing value as a *suggestion for the designer to apply in Figma*, then leave the file as Figma defines it. For structural issues (ordering, broken references), correct and re-lint before finalising the file.
 
 If the CLI is not installed:
 
@@ -459,7 +459,7 @@ npm install --save-dev design.md
 2. **Both themes** — every color entry includes light and dark resolved values
 3. **Agent-readable** — tables over prose, scannable structure, no filler text
 4. **Design intent lives here** — structural/API docs belong in specs; DESIGN.md captures mood, constraints, and rules
-5. **Figma-resolved values are authoritative** — when a live Figma read and the token map/CSS disagree, the file records Figma's value. Always include the CSS custom property name alongside it so agents can still reference the live token in code.
+5. **Figma is the source of truth and wins on disagreement** — Figma-resolved values are authoritative: when a live Figma read and the token map/CSS disagree, the file records Figma's value. Always include the CSS custom property name alongside it so agents can still reference the live token in code.
 6. **`--no-figma` output is labelled, not silent** — a code-only DESIGN.md must say so at the top of the file, so nobody mistakes it for a Figma-verified one
 
 ## Usage

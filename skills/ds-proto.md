@@ -71,15 +71,24 @@ If the registry does not exist, fall back to the individual file reads described
 
 **Figma-first constraint:** prototype only with components that exist in code (`presence.inCode: true`). A component that's designed in Figma but not built yet (`inCode: false`) is not available — note it as a gap for the user rather than inventing a local stand-in (Guardrail 2, SOURCE-OF-TRUTH.md).
 
+### 1.0.1 Establish Figma as the Design Authority
+
+A prototype implements designs; it doesn't make them (see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md)). Before composing anything:
+
+1. From the registry (or `.claude/ds-story-figma-map.json`), classify every component by `presence`: **built** (`inFigma` + `inCode`), **Figma-only** (`inCode: false` — designed, not built), **code-only** (`inFigma: false` — built without a Figma source).
+2. Run `node scripts/check-snapshot.mjs` if available. If the snapshot is stale or unversioned, say so at the top of the output: the prototype was composed against possibly out-of-date design data.
+3. Read `DESIGN.md`'s `ds-source` provenance comment (Phase 1.6). Anything other than `figma-live` means design intent is unverified — say so.
+4. For a built component you need to use in an unusual way, read its Figma variants (`/ds-spec <Name>`) instead of guessing from code props.
+
 ### 1.1 Load Component Inventory
 
 1. **Read `design-system-manifest.json`** — full component inventory with props, argTypes, and variants
 2. **Read your DS barrel export** (e.g., `src/index.ts`) — confirm available components
-3. **Read `.claude/ds-story-figma-map.json`** — Storybook story IDs and source paths
+3. **Read `.claude/ds-story-figma-map.json`** — Storybook story IDs, source paths, and which components exist only in Figma
 
 ### 1.2 Load Token & Style Context
 
-1. **Read your CSS token files** — semantic colour tokens, spacing scales
+1. **Read your CSS token files** — semantic colour tokens, spacing scales. These are the *implementation*; the design values are Figma's (via `.claude/ds-token-map.json` / `DESIGN.md`). If a CSS token disagrees with the token map, use the Figma value's token name and flag the CSS drift instead of adapting the prototype to it
 2. **Read your app-level styles** — custom properties, breakpoints, animations
 3. Note the spacing grid, breakpoints, and colour semantics
 
@@ -106,6 +115,8 @@ The file provides: visual theme and mood, semantic color palette with light/dark
 - Inform layout density and rhythm decisions in Phase 4 (match the stated visual theme)
 - Ground concept generation in Phase 2.7 (each concept should be distinct but consistent with the stated identity)
 - Catch violations in the Phase 4.6 self-critique (flag any token usage or layout choice that contradicts the guidelines)
+
+Check its `<!-- ds-source: ... -->` comment first. `figma-live` = verified design intent. `code-fallback` or missing = **not Figma-verified**: use it only as a hint and say so in the output. Never treat code-derived guidelines as design decisions.
 
 If DESIGN.md is absent, continue normally — all other context sources cover the structural side. Run `/ds-design-md` to generate one.
 
@@ -179,7 +190,8 @@ Map each requirement to existing components:
 1. **Direct match** — existing component satisfies the need as-is
 2. **Composition match** — multiple components compose to satisfy the need
 3. **Prop extension** — existing component with different prop values
-4. **No match** — nothing in the inventory fits
+4. **Figma-only** — a component designed in Figma but not built (`presence.inCode: false`). Don't invent a stand-in; see 3.2
+5. **No match** — nothing in the built inventory *or* in Figma fits
 
 ### 3.2 Triple-Check Validation (for "no-match" items only)
 
@@ -188,7 +200,9 @@ Before proposing new code:
 - **Check 2:** Cross-reference with existing app implementations
 - **Check 3:** Prop extension feasibility
 
-If all three confirm no solution, flag for new code (requires `--experimental` flag or user approval).
+**Check 0 comes first: does Figma already design it?** If a Figma component covers the need, this is a *Figma-only gap*, not a "no match" — read its spec with `/ds-spec <Name>`, and any implementation is built **from that spec** (with approval), never invented.
+
+If Figma has nothing either, it's a **design gap**: the prototype may include a clearly labelled `@experimental` placeholder (requires `--experimental` or user approval) but it is an unapproved design and is listed under "Figma gaps" in the output for a designer to resolve. Code-side experiments never become the design of record.
 
 ### 3.3 Present Component Plan
 
@@ -236,7 +250,7 @@ Before writing each component section, resolve: which component, which variant/p
 
 ### 4.3 Experimental Components (only if approved)
 
-If new code was approved:
+If new code was approved (built from the Figma spec when Figma designs it; otherwise labelled an unapproved design):
 1. Create in an `experimental/` directory
 2. Do NOT add to the barrel export
 3. Match existing component patterns
@@ -252,7 +266,7 @@ Create stories for each state: Default, Empty, Loading, Error. Add Mobile varian
 
 ### 4.6 Self-Critique (before showing output)
 
-Run a silent self-review checking: composition rhythm, spacing grid compliance, typography hierarchy, surface layering, interactive states, content realism, and structural integrity.
+Run a silent self-review checking: token names match Figma-verified tokens (no invented values), composition rhythm, spacing grid compliance, typography hierarchy, surface layering, interactive states, content realism, and structural integrity.
 
 ---
 
@@ -276,11 +290,11 @@ Score using the 0-5 scale from `.claude/rules/accessibility.md`. Fix all P0 issu
 
 ## Phase 6: Output & Evidence
 
-Present: story file path, Storybook URL, component map, WCAG score (if audited), and any new code flags.
+Present: story file path, Storybook URL, component map (each component with its Figma node ID), WCAG score (if audited), and any new code flags. Always include a **Figma parity** block: components used and their Figma variants, **Figma-only gaps** hit (designed, not built), **design gaps** (needed, in neither), any CSS-vs-Figma token drift noticed, and whether the snapshot/DESIGN.md were Figma-verified.
 
 ### 6.1 Persist Design Decisions
 
-After delivering the prototype, update `.claude/proto-decisions.md` with established patterns, layout decisions, and rejected defaults.
+After delivering the prototype, update `.claude/proto-decisions.md` with established patterns, layout decisions, and rejected defaults. These are **implementation/prototype decisions, not design authority**: tag each entry `(prototype-derived, pending design review)`. `/ds-design-md` reproduces them under that label until a designer confirms them in Figma.
 
 ---
 
@@ -290,7 +304,7 @@ Skip standard workflow. Explore variations of an existing component in a sandbox
 
 ## Redesign Mode (`--redesign`)
 
-Skip standard workflow. Iterate on an existing app view alongside the original. Create Before/After story variants. Never modify the original route file.
+Skip standard workflow. Iterate on an existing app view alongside the original. Create Before/After story variants. These are explorations to show a designer, not design decisions. Never modify the original route file.
 
 ## Discard Mode (`--discard`)
 
@@ -307,6 +321,7 @@ Find and interactively remove prototype story files from the current branch.
 5. **Evidence-based completion** — every prototype has a Storybook URL, component map, and WCAG score
 6. **Accessibility on demand** — pass `--wcag` to run the audit
 7. **Existing patterns** — study your app's existing pages before composing
+8. **Figma is the design authority** — a prototype implements Figma's designs; it never redefines a component, token, or pattern. Gaps are reported, not silently filled, and prototype decisions never become design decisions without review
 
 ## Usage
 

@@ -252,7 +252,7 @@ For P0 and P1 issues where the fix is clear and mechanical, run a fix-then-verif
 After Phase 3, collect all P0 and P1 issues across all components. Classify each as:
 
 - **AUTO** — can be applied mechanically with the Edit tool
-- **MANUAL** — requires design or structural judgment
+- **MANUAL** — requires design or structural judgment. **Colour contrast failures are always MANUAL/design issues**: the colours come from Figma's variables, so the fix is a designer's decision in Figma. Never auto-fix contrast by editing a token or picking a different colour in code (that would make code the design authority). The only code-side contrast fix is when code's value *differs* from Figma's — that's drift, fixed toward Figma via `/ds-sync`
 
 **Auto-fixable patterns:**
 
@@ -390,7 +390,7 @@ Use the WCAG 2.0 luminance formula from `.claude/rules/accessibility.md` section
 ### Failing Pairs
 | Component | Theme | Pair | Ratio | Required | Fix |
 |-----------|-------|------|-------|----------|-----|
-| Input | Dark | --muted-foreground / --surface-background | 3.1:1 | 4.5:1 | Darken --muted-foreground in dark mode |
+| Input | Dark | --muted-foreground / --surface-background | 3.1:1 | 4.5:1 | **Design issue** — Figma variable `muted-foreground` (Dark) fails 4.5:1; designer adjusts it in Figma (a passing value is ≥ ~#8a8f98 for reference). Do not override the token in code |
 ```
 
 ---

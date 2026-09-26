@@ -8,7 +8,7 @@ Compare the current `DESIGN.md` against any git ref and report token-level chang
 
 ## Prerequisites
 
-- `DESIGN.md` or `.claude/DESIGN.md` with YAML front matter (generated with `/ds-design-md --spec`)
+- `DESIGN.md` or `.claude/DESIGN.md` with YAML front matter (generated with `/ds-design-md --spec`). A diff is only a *Figma* diff if both refs carry `ds-source: figma-live`; if either side is `code-fallback` or unlabelled, say so at the top of the diff output
 - `design.md` CLI installed (`npm install --save-dev design.md`)
 - Git repository with commit history
 

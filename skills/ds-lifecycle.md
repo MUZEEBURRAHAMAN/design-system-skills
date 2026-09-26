@@ -156,7 +156,9 @@ For components approaching promotion to **stable**, verify:
 - [ ] Story file has at least 3 variants (default, disabled, error/edge case)
 - [ ] ds-wcag score: COMPLIANT or MINOR ISSUES only (≥ 14/20)
 - [ ] No open P0 issues in ds-wcag report
-- [ ] Token bindings verified (no hardcoded values in Figma)
+- [ ] Token bindings verified (no hardcoded values in Figma, and code uses the tokens Figma binds)
+- [ ] Figma parity: latest `/ds-audit-figma` shows MATCH for the component (code drift resolved toward Figma)
+- [ ] The Figma component itself is marked ready by its design owner — stability of the *implementation* never overrides the design status
 - [ ] ds-spec file exists
 - [ ] `changelog.md` or registry `changelog[]` entry for this release
 
@@ -212,6 +214,8 @@ Mark a component as deprecated and generate all required notices.
 
 ### 5.1 Collect Deprecation Info
 
+First confirm the design decision exists: the component is deprecated or replaced **in Figma** (or a designer has approved the deprecation). Deprecation starts in design; if Figma still treats it as current, stop and flag the mismatch rather than deprecating unilaterally in code.
+
 Ask for:
 - **Replacement component** (or "none")
 - **Removal target date** (e.g., "2026-10-01")
@@ -257,6 +261,7 @@ Validate that a component is safe to remove from the codebase.
 ### 6.1 Pre-removal Checklist
 
 - [ ] Stage is `deprecated`
+- [ ] The component is removed or deprecated in Figma (design owner has retired it)
 - [ ] Removal target date has passed (or is today)
 - [ ] Zero active usages in application code (run usage scan)
 - [ ] Replacement component has been available for ≥ 4 weeks in `stable`
@@ -276,7 +281,7 @@ If all checks pass, report what will be deleted and ask for confirmation before 
 
 ## Lifecycle State File
 
-`.claude/ds-lifecycle.json` is the source of truth for all lifecycle state. It should be committed to the repository so the team shares a single view of component maturity.
+`.claude/ds-lifecycle.json` is the source of truth for the *implementation's* maturity state (design status lives in Figma, and wins where they conflict). It should be committed to the repository so the team shares a single view of component maturity.
 
 To initialise it for an existing design system:
 

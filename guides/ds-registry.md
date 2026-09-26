@@ -4,6 +4,8 @@ The DS Registry is a single JSON file (`.claude/ds-registry.json`) that combines
 
 **Figma-first:** the registry is built by enumerating Figma's sections/components *first*, then merging in code. A component that exists in Figma but has no implementation yet still gets a full entry — `presence: { inFigma: true, inCode: false }` — not a footnote. See [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) Guardrail 6.
 
+**Provenance & freshness:** the generator stamps `_meta.snapshot` (Figma file/version/modified time plus SHA-256 of the mapping and token map it read). `node scripts/check-snapshot.mjs` verifies the registry matches the committed mapping, isn't too old, and — given a live Figma value — isn't older than Figma.
+
 **Time estimate:** 15 minutes to set up generation, then fully automatic.
 
 ---

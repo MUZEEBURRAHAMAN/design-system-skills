@@ -1,0 +1,35 @@
+{
+  "_meta": {
+    "figmaFile": "FIXTURE_FILE_KEY",
+    "storybookBase": "http://localhost:6006/iframe.html?id={storyId}&viewMode=story&globals=theme:{theme}",
+    "semanticCollection": "VariableCollectionId:1:1",
+    "lightMode": "1:0",
+    "darkMode": "1:1",
+    "figmaVersion": "1234567890",
+    "figmaModifiedAt": "2026-09-20T10:00:00.000Z"
+  },
+  "sections": {
+    "Actions": {
+      "sectionFrameId": "10:1",
+      "components": {
+        "Button": { "figmaId": "10:2", "figmaType": "COMPONENT_SET", "variantCount": 4, "stories": ["components-actions-button--primary"], "sourceFile": "packages/ds/src/components/button.tsx" },
+        "IconButton": { "figmaId": "10:3", "figmaType": "COMPONENT_SET", "variantCount": 2, "stories": ["components-actions-iconbutton--default", "components-actions-iconbutton--disabled"] }
+      }
+    },
+    "Data Display": {
+      "sectionFrameId": "20:1",
+      "components": {
+        "Badge": { "figmaId": "20:2", "figmaType": "COMPONENT_SET", "variantCount": 2 }
+      }
+    },
+    "Forms": {
+      "sectionFrameId": "30:1",
+      "components": {
+        "DatePicker": { "figmaId": "30:2", "figmaType": "COMPONENT_SET", "variantCount": 6 }
+      }
+    }
+  },
+  "storybookOnly": { "useDebounce": { "reason": "Hook: no visual Figma counterpart" } },
+  "figmaOnly": { "ColorPalette": { "figmaId": "99:1", "reason": "Documentation-only frame in Figma" } },
+  "keyVariableIds": { "primaryForeground": "VariableID:1:2" }
+}

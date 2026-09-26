@@ -358,7 +358,7 @@ pnpm ds:registry   # entries with presence.inCode: false
 
 ## Optional: Set Up Figma Code Connect
 
-[Figma Code Connect](code-connect.md) publishes your real component API (props, variants, import paths) to Figma's Dev Mode and the MCP server. It publishes implementation status against your Figma components — Figma's own variant and property definitions stay canonical, and Code Connect records which code implements them.
+[Figma Code Connect](code-connect.md) publishes your real component API (props, variants, import paths) to Figma's Dev Mode and the MCP server. Publishing is an explicit, approved action (a dry run first, then a person decides) — see the guide. It publishes implementation status against your Figma components — Figma's own variant and property definitions stay canonical, and Code Connect records which code implements them.
 
 Two options:
 - **Code Connect CLI** — write `.figma.tsx` files alongside your components, publish from terminal

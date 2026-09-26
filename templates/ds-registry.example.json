@@ -4,6 +4,14 @@
     "generatedAt": "2026-03-01T12:00:00.000Z",
     "generatedBy": "scripts/generate-ds-registry.ts",
     "figmaFile": "YOUR_FIGMA_FILE_KEY",
+    "snapshot": {
+      "source": "figma-mapping",
+      "figmaFile": "YOUR_FIGMA_FILE_KEY",
+      "figmaVersion": "FIGMA_FILE_VERSION_AT_REFRESH",
+      "figmaModifiedAt": "2026-01-01T00:00:00.000Z",
+      "figmaMapSha256": "<sha256 of .claude/ds-story-figma-map.json>",
+      "tokenMapSha256": "<sha256 of .claude/ds-token-map.json>"
+    },
     "tokenStats": {
       "primitives": 48,
       "semantic": 92

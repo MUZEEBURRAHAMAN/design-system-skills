@@ -256,6 +256,9 @@ If `--generate` or `--update` flag is set, write `.claude/ds-token-map.json`:
 {
   "_meta": {
     "generatedAt": "2026-04-17T00:00:00Z",
+    "figmaFile": "FIGMA_FILE_KEY",
+    "figmaVersion": "1234567890",
+    "figmaModifiedAt": "2026-04-16T09:30:00.000Z",
     "cssTokenCount": 124,
     "figmaVariableCount": 118,
     "parityScore": 94
@@ -285,6 +288,8 @@ If `--generate` or `--update` flag is set, write `.claude/ds-token-map.json`:
   "orphaned": ["legacy/button-hover"]
 }
 ```
+
+`figmaVersion`/`figmaModifiedAt` record which state of the Figma file this map was read from (REST `GET /v1/files/:key`, or the Figma Console MCP file-data/version tools) — `scripts/check-snapshot.mjs` refuses a snapshot without them.
 
 For `--update`, merge with the existing map: preserve manually-set overrides (entries with `"manual": true`), add new MATCH entries, flag changed statuses.
 

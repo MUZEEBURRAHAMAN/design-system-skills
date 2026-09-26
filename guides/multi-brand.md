@@ -128,10 +128,10 @@ If the registry is used, either:
 Pass the brand as a flag or argument. Skills check the registry for a matching brand entry and load the correct mapping/token files.
 
 ```bash
-# Sync Brand A to Figma (default)
+# Bring Brand A's code into line with its Figma file (default)
 /ds-sync
 
-# Sync Brand B to Figma
+# Bring Brand B's code into line with its Figma file
 /ds-sync --brand brand-b
 
 # Run a parity report for Brand B
