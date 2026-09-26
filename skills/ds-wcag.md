@@ -80,7 +80,9 @@ Read the component source file and verify:
 
 ### 2.2 Rendered Audit (Storybook + axe-core)
 
-Navigate to the component's default story in Storybook and run axe-core programmatically:
+Navigate to the component's default story in Storybook and run axe-core programmatically.
+
+**Let the page settle first.** After loading a story or switching theme (`globals=theme:dark`), wait ≥ 1.5 s (colour transitions are 100–300 ms) before running axe. Measured mid-transition, axe reports a phantom `color-contrast` failure that disappears on a clean re-run (seen on the real AI UI Kit's dark Approval Request). Re-run any single contrast failure once after settling before reporting it; report it only if it reproduces. Confirm the theme really switched (`document.documentElement.dataset.theme`) so a "dark" pass is not a light page.
 
 ```js
 // In preview_eval:

@@ -70,6 +70,8 @@ A flat object keyed by PascalCase component name — the name is stable identity
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | `string` | Component name (matches the key) |
+| `partOf` | string (optional) | A code-only export that lives in the source file of a Figma-known component (compound part such as `CardHeader`). Not a design gap; excluded from "built without Figma" counts. |
+| `codeIdentity` | `"mapped"` (optional) | Presence in code came from the mapping file's `sourceFile` because the export has a different name from the Figma component (Figma `Toast` ↔ `ToastProvider`). |
 | `presence` | `{ inFigma: boolean, inCode: boolean }` | Whether the component actually exists on each side. `{inFigma:true, inCode:false}` is a real component pending implementation. `{inFigma:false, inCode:true}` was built without a Figma source — worth a second look under a Figma-first policy. |
 | `section` | `string` | Storybook/Figma section (e.g., `"Actions"`, `"Forms"`) |
 | `package` | `string?` | Package name (e.g., `@acme/ds`) — absent when `presence.inCode` is false |

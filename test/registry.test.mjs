@@ -130,6 +130,11 @@ test("a component with no barrel export at all still appears when Figma has it",
   try {
     writeFileSync(join(dir, "packages/ds/src/main.tsx"), "");
     writeFileSync(join(dir, "packages/form/src/main.tsx"), "");
+    // a mapping sourceFile that exists would (correctly) count as built, so strip it: this test is about "not built"
+    const mp = join(dir, ".claude/ds-story-figma-map.json");
+    const m = JSON.parse(readFileSync(mp, "utf8"));
+    for (const s of Object.values(m.sections)) for (const c of Object.values(s.components)) delete c.sourceFile;
+    writeFileSync(mp, JSON.stringify(m));
     const r = buildRegistry(fixtureConfig(dir));
     assert.deepEqual(Object.keys(r.components).sort(), ["Badge", "Button", "DatePicker", "IconButton"]);
     assert.ok(Object.values(r.components).every((c) => c.presence.inFigma && !c.presence.inCode));

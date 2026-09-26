@@ -9,7 +9,7 @@ Convert the YAML front matter in `DESIGN.md` to token formats consumed by other 
 ## Prerequisites
 
 - `DESIGN.md` or `.claude/DESIGN.md` with YAML front matter
-- `design.md` CLI installed (`npm install --save-dev design.md`) for Tailwind and W3C export
+- `design.md` CLI installed (`npm install --save-dev @google/design.md`) for Tailwind and W3C export
 - Node.js for Style Dictionary and CSS output
 
 ## Arguments
@@ -74,7 +74,7 @@ module.exports = {
 ## Phase 3: Export W3C DTCG JSON
 
 ```bash
-npx design.md export --format w3c DESIGN.md
+npx design.md export --format dtcg DESIGN.md
 ```
 
 Write to `<out>/tokens.json` following the [W3C Design Tokens format](https://www.w3.org/community/design-tokens/):

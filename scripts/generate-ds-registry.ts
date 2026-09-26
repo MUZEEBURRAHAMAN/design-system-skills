@@ -376,6 +376,10 @@ interface RegistryComponent {
   presence: { inFigma: boolean; inCode: boolean };
   package?: string;
   sourceFile?: string;
+  /** Set on a code-only export that lives in the source file of a Figma-known component (a compound part). */
+  partOf?: string;
+  /** "mapped": presence comes from the mapping file's sourceFile, not from an export with the same name */
+  codeIdentity?: "mapped";
   variants?: Record<string, string[]>;
   defaultVariants?: Record<string, string>;
   props?: Record<string, string>;
@@ -701,6 +705,19 @@ export function buildRegistry(config: RegistryConfig = defaultConfig()): Registr
       fnm = fnRe.exec(source);
     }
 
+    // Aliased re-exports declared in the component file itself, e.g.
+    // `export { Drawer as Sheet, DrawerClose as SheetClose } from '../Drawer'` — the alias is the public name.
+    const aliasRe = /export\s*\{([^}]*)\}\s*from\s*["'][^"']+["']/g;
+    let am = aliasRe.exec(source);
+    while (am) {
+      for (const part of am[1].split(",")) {
+        if (!/\sas\s/.test(part)) continue; // plain re-exports are barrel plumbing, not declarations
+        const alias = part.trim().split(/\s+as\s+/).pop()!.trim();
+        if (/^[A-Z]\w*$/.test(alias) && !alias.endsWith("Props") && !alias.endsWith("Variants") && !exportedNames.includes(alias)) exportedNames.push(alias);
+      }
+      am = aliasRe.exec(source);
+    }
+
     if (exportedNames.length === 0) continue;
 
     const cvaVariants = extractCvaVariants(source);
@@ -712,7 +729,7 @@ export function buildRegistry(config: RegistryConfig = defaultConfig()): Registr
     for (const name of exportedNames) {
       // CUSTOMISE: Skip patterns for your project. These skip icon components
       // and Remix Icon re-exports by default. Adjust or remove as needed.
-      if (name.endsWith("Icon") && !name.includes("Button")) continue;
+      if (name !== "Icon" && name.endsWith("Icon") && !name.includes("Button")) continue;
       if (name.startsWith("Ri")) continue;
 
       // Higher-priority packages win: skip if a higher-priority package
@@ -765,6 +782,39 @@ export function buildRegistry(config: RegistryConfig = defaultConfig()): Registr
 
       components[name] = entry;
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // PASS 2b — a mapping entry that names its own `sourceFile` is the project
+  // stating "this Figma component is implemented here", even when the code
+  // exports it under another name (e.g. Figma "Toast" -> ToastProvider/useToast,
+  // Figma "File" -> FileItem). Honour it instead of reporting a built
+  // component as Figma-only. Only when the file really exists.
+  // ---------------------------------------------------------------------
+  for (const [name, figma] of figmaByComponent) {
+    const entry = components[name];
+    const declared = figma.entry.sourceFile;
+    if (!entry || entry.presence.inCode || !declared) continue;
+    if (!existsSync(join(config.root, declared))) continue;
+    entry.presence.inCode = true;
+    entry.sourceFile = declared;
+    entry.codeIdentity = "mapped";
+  }
+
+  // ---------------------------------------------------------------------
+  // PASS 2c — compound parts. A code-only export that lives in the same source
+  // file as a component Figma does know (CardHeader in Card.tsx, DialogTitle in
+  // Dialog.tsx) is a part of that Figma component, not a component built without
+  // a design. Tag it `partOf` so reports don't list it as "no Figma source".
+  // ---------------------------------------------------------------------
+  const ownerBySource = new Map<string, string>();
+  for (const c of Object.values(components)) {
+    if (c.presence.inFigma && c.presence.inCode && c.sourceFile && !ownerBySource.has(c.sourceFile)) ownerBySource.set(c.sourceFile, c.name);
+  }
+  for (const c of Object.values(components)) {
+    if (c.presence.inFigma || !c.presence.inCode || !c.sourceFile) continue;
+    const owner = ownerBySource.get(c.sourceFile);
+    if (owner && owner !== c.name) c.partOf = owner;
   }
 
   // Build tokens section (compact form)
@@ -888,7 +938,7 @@ function main(): void {
     (c) => c.presence.inFigma && !c.presence.inCode,
   );
   const builtWithoutFigma = allComponents.filter(
-    (c) => c.presence.inCode && !c.presence.inFigma,
+    (c) => c.presence.inCode && !c.presence.inFigma && !c.partOf,
   );
 
   console.log(`ds-registry.json generated:`);

@@ -80,7 +80,7 @@ If the file is absent, generate it from the registry/manifest with all built com
 
 ### 1.2 Cross-Reference with Registry
 
-For each component in the registry/manifest, verify it has a lifecycle entry. Flag components with no entry as **UNTRACKED**.
+For each component in the registry/manifest, verify it has a lifecycle entry. **Skip registry entries with a `partOf` field** (`CardHeader`, `DialogTitle` …): they are compound parts of a component Figma knows and are tracked through their parent's entry, never as separate components. Flag components with no entry as **UNTRACKED**.
 
 ---
 
@@ -130,6 +130,12 @@ List all components grouped by lifecycle stage:
 ## Phase 3: Lifecycle Audit (`audit`)
 
 Check for components that may be in the wrong stage or overdue for promotion.
+
+### 3.0 Figma-only and Figma-removed components
+
+- `presence.inCode: false` (designed in Figma, not built): the stage must be `proposed`, and it **cannot be promoted** to `alpha` or beyond until code exists. `promote` on it stops with "Not built yet — implement from the Figma properties (`/ds-spec <Name>`), then promote." Never create a stub component to satisfy a checklist.
+- `presence.inFigma: false` on a component that is `beta`/`stable` (and has no `partOf`): built without a Figma source. Report it for the design owner; do not delete anything and do not create Figma content.
+- `codeIdentity: "mapped"`: presence came from the mapping file's `sourceFile` (Figma "Toast" ↔ `ToastProvider`); treat as built.
 
 ### 3.1 Overdue for Promotion
 

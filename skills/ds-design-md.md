@@ -204,7 +204,7 @@ Map to semantic usage:
 
 ## Phase 7: Generate DESIGN.md
 
-Assemble all extracted data into the standard DESIGN.md format. The file is designed to be read by AI agents as persistent context — keep it scannable, specific, and free of filler. Put a machine-readable provenance comment as the very first line: `<!-- ds-source: figma-live; figmaFile: FIGMA_FILE_KEY; generatedAt: 2026-09-26T00:00:00.000Z -->` (`figma-live` only when Figma was actually read this run). Under `--no-figma` write `<!-- ds-source: code-fallback -->` instead, and add a one-line notice right under the title: `> ⚠️ Generated with --no-figma: code sources only, not verified against Figma.` Omit it entirely when Figma was read successfully.
+Assemble all extracted data into the standard DESIGN.md format. The file is designed to be read by AI agents as persistent context — keep it scannable, specific, and free of filler. Put a machine-readable provenance comment as the very first line (in `--spec` output, immediately after the closing `---` of the front matter instead — see Phase 7.5): `<!-- ds-source: figma-live; figmaFile: FIGMA_FILE_KEY; generatedAt: 2026-09-26T00:00:00.000Z -->` (`figma-live` only when Figma was actually read this run). Under `--no-figma` write `<!-- ds-source: code-fallback -->` instead, and add a one-line notice right under the title: `> ⚠️ Generated with --no-figma: code sources only, not verified against Figma.` Omit it entirely when Figma was read successfully.
 
 ```markdown
 # DESIGN.md
@@ -357,41 +357,32 @@ Build the block from extracted tokens. Use `{path.to.token}` references for comp
 
 ```yaml
 ---
-colors:
-  primary: "<resolved hex — light mode>"
-  background: "<resolved hex — light mode>"
-  foreground: "<resolved hex — light mode>"
-  muted: "<resolved hex — light mode>"
-  border: "<resolved hex — light mode>"
-  destructive: "<resolved hex — light mode>"
-  success: "<resolved hex — light mode>"
-typography:
-  fontFamily: "<primary font stack>"
-  monoFamily: "<mono font stack>"
-  scale:
-    xs: { size: "12px", weight: 400, lineHeight: 1.5 }
-    sm: { size: "14px", weight: 400, lineHeight: 1.5 }
-    base: { size: "16px", weight: 400, lineHeight: 1.5 }
-    lg: { size: "18px", weight: 500, lineHeight: 1.4 }
-    xl: { size: "20px", weight: 600, lineHeight: 1.3 }
-    2xl: { size: "24px", weight: 700, lineHeight: 1.2 }
-spacing:
-  base: "<base unit in px>"
-  scale: [4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96]
-rounding:
-  sm: "<value>"
-  md: "<value>"
-  lg: "<value>"
-  full: "9999px"
-components:
+version: alpha
+name: "<system name>"
+colors:                       # resolved hex, light mode, one entry per role you reference
+  primary: "<hex>"
+  background: "<hex>"
+  foreground: "<hex>"
+  border: "<hex>"
+  destructive: "<hex>"
+  on-primary: "<hex>"
+typography:                   # one entry per named text style — NOT a fontFamily/scale block
+  body-md: { fontFamily: "<family>", fontSize: 16px, fontWeight: 400, lineHeight: 1.5 }
+  heading-md: { fontFamily: "<family>", fontSize: 24px, fontWeight: 600, lineHeight: 1.2 }
+  code-md: { fontFamily: "<mono family>", fontSize: 14px, fontWeight: 400, lineHeight: 1.5 }
+rounded: { sm: 4px, md: 8px, lg: 12px, full: 9999px }   # the key is `rounded`, not `rounding`
+spacing: { xs: 4px, sm: 8px, md: 12px, lg: 16px }
+components:                   # sub-tokens are backgroundColor / textColor / rounded / height / typography ...
   button:
-    background: "{colors.primary}"
-    foreground: "#ffffff"
-  card:
-    background: "{colors.background}"
-    border: "{colors.border}"
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    rounded: "{rounded.md}"
 ---
 ```
+
+Names come from Figma (variable / text-style names, `/` becomes `-`). This shape was validated against `design.md lint` (0 unrecognised properties); the older `fontFamily`/`scale`, `rounding`, `background`/`foreground` shapes are silently ignored by the linter.
+
+**Provenance comment placement in `--spec` output:** the front matter must be the first thing in the file or the parser sees no tokens at all. Put the `<!-- ds-source: ... -->` comment on the line **immediately after the closing `---`**. (Non-spec output puts it on line 1.) `scripts/check-snapshot.mjs` finds it in either place.
 
 Include one entry per component family in the registry. Use `{colors.*}` references where a component token directly aliases a semantic color — the spec linter enforces these resolve.
 
@@ -448,7 +439,7 @@ Report violations to the user. For contrast failures, do **not** change any valu
 If the CLI is not installed:
 
 ```bash
-npm install --save-dev design.md
+npm install --save-dev @google/design.md
 ```
 
 ---

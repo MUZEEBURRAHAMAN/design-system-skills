@@ -126,6 +126,8 @@ return {
 
 Also read each variant's fills/strokes/text `boundVariables` (see `ds-audit-figma.md` Phase 3.2) so the token table is built from Figma's own bindings. From this read, populate: **§2.1 Anatomy** (child layers), **§2.2 API** (Figma variant properties and their values become the component's intended props), **§2.3 Tokens** (Figma variable bindings per element/state), **§2.4 Structure** (Figma dimensions/padding/gap/radius).
 
+**State galleries.** A single `COMPONENT` (not a set) whose direct children are named state frames — e.g. Composer: `Idle · empty`, `Streaming · Stop`, `Error · Retry`, `Size=SM · Idle`, `Narrow (≤ 359px)…`; GeneratedCard: `Ready`, `Generating`, `Error · Retry` — is a gallery of states, not an anatomy. List those frames under **States** (they are the design's required states), then read anatomy, tokens and measurements from the *first state frame's* children. Do not report the state frames as anatomy layers, and do not report `props: []` as "no API" — say the Figma component declares no properties and that states come from the gallery. Count solid fills with no variable binding and report them as Figma-side hard-coded values (Guardrail 3) for the design owner; never bind or repair them.
+
 If the registry says `presence.inCode: false`, this is the whole spec — skip 1.1–1.3 and mark the API section "Not yet implemented; implement from the Figma properties above."
 
 ### 1.1 Source Code Read (checked against the Figma spec)

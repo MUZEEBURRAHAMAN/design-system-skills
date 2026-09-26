@@ -159,7 +159,7 @@ The Agent Prompt Guide section is omitted in spec output — it's Claude Code-sp
 
 ### CLI tools
 
-With the `design.md` CLI installed (`npm install --save-dev design.md`):
+With the `design.md` CLI installed (`npm install --save-dev @google/design.md`):
 
 ```bash
 # Validate the file — broken references, contrast, missing tokens, section order
@@ -170,7 +170,7 @@ npx design.md diff DESIGN.md DESIGN.md.prev
 
 # Export tokens to Tailwind config or W3C DTCG format
 npx design.md export --format tailwind DESIGN.md > tailwind-tokens.js
-npx design.md export --format w3c DESIGN.md > tokens.json
+npx design.md export --format dtcg DESIGN.md > tokens.json
 ```
 
 `/ds-design-md --spec` runs the linter automatically after writing the file and reports any violations.

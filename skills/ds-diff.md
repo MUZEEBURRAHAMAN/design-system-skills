@@ -9,7 +9,7 @@ Compare the current `DESIGN.md` against any git ref and report token-level chang
 ## Prerequisites
 
 - `DESIGN.md` or `.claude/DESIGN.md` with YAML front matter (generated with `/ds-design-md --spec`). A diff is only a *Figma* diff if both refs carry `ds-source: figma-live`; if either side is `code-fallback` or unlabelled, say so at the top of the diff output
-- `design.md` CLI installed (`npm install --save-dev design.md`)
+- `design.md` CLI installed (`npm install --save-dev @google/design.md`)
 - Git repository with commit history
 
 ## Arguments
@@ -39,10 +39,10 @@ Confirm the current file has YAML front matter. If not, prompt the user to regen
 ## Phase 2: Run `design.md diff`
 
 ```bash
-npx design.md diff /tmp/design-md-prev.md DESIGN.md --json > /tmp/design-md-diff.json
+npx design.md diff /tmp/design-md-prev.md DESIGN.md --format json > /tmp/design-md-diff.json
 ```
 
-Parse the JSON output into four change categories:
+The CLI's JSON is `{ tokens: { colors|typography|rounded|spacing|components: { added, removed, modified } }, findings: { before, after, delta } (lint counts), regression: boolean (lint errors/warnings increased — not a contrast result; compute contrast yourself in Phase 3) }`. Map it to four change categories (the CLI calls "Changed" `modified`):
 
 | Category | Description |
 |---|---|
@@ -141,7 +141,24 @@ If `--fail-on-contrast` is set and any contrast regression was found, exit with 
 
 ---
 
+## Direction (Figma-first)
+
+Read the `ds-source` comment on **both** sides before interpreting any change, and state the direction at the top of the report:
+
+| Ref → Current | Meaning of a changed token | Fix proposed |
+|---|---|---|
+| `figma-live` → `figma-live` | The **design changed in Figma** (deliberate). Report as a design update. | Implementation should follow; run `/ds-tokens` / `/ds-sync` |
+| `figma-live` → `code-fallback` (or unlabelled) | The current file was regenerated from **code** and disagrees with the Figma-verified ref: **implementation drift**, Figma is correct | Correct the CSS/token source (proposal only), or regenerate with `/ds-design-md`; never edit Figma |
+| `code-fallback` → `figma-live` | Code was corrected toward Figma (or Figma moved); report as convergence | none |
+| neither side `figma-live` | Not a Figma diff. Say so; no drift claim | Regenerate from Figma first |
+
+A changed value is never described as "Figma is stale". `--fail-on-contrast` findings are design issues for the Figma owner, not something to patch in code.
+
+---
+
 ## Key Rules
+
+0. **Figma wins** — a `figma-live` file is the reference; a diff against it that shows a different code-derived value is implementation drift (see Direction).
 
 1. **Front matter required** — no YAML front matter means no structured diff. Prompt regeneration rather than guessing.
 2. **Contrast regression is blocking** — a color that passes in `main` and fails in a PR branch is a ship stopper.

@@ -1,12 +1,73 @@
 {
-  "_meta": { "figmaFile": "FIXTURE_B", "storybookBase": "http://localhost:6006/iframe.html?id={storyId}", "semanticCollection": "c", "lightMode": "0", "darkMode": "1", "figmaVersion": "1", "figmaModifiedAt": "2026-09-20T00:00:00.000Z" },
-  "sections": {
-    "Content & Data": { "sectionFrameId": "1:1", "components": {
-      "Card": { "figmaId": "1:2", "figmaType": "COMPONENT_SET", "variantCount": 4 },
-      "List": { "figmaId": "1:3", "figmaType": "COMPONENT", "variantCount": 1 },
-      "ListItem": { "figmaId": "1:4", "figmaType": "COMPONENT", "variantCount": 1 } } },
-    "Feedback & Status": { "sectionFrameId": "2:1", "components": {
-      "Toast": { "figmaId": "2:2", "figmaType": "COMPONENT_SET", "variantCount": 4 } } }
+ "_meta": {
+  "figmaFile": "FIXTURE_B",
+  "storybookBase": "http://localhost:6006/iframe.html?id={storyId}",
+  "semanticCollection": "c",
+  "lightMode": "0",
+  "darkMode": "1",
+  "figmaVersion": "1",
+  "figmaModifiedAt": "2026-09-20T00:00:00.000Z"
+ },
+ "sections": {
+  "Content & Data": {
+   "sectionFrameId": "1:1",
+   "components": {
+    "Card": {
+     "figmaId": "1:2",
+     "figmaType": "COMPONENT_SET",
+     "variantCount": 4
+    },
+    "List": {
+     "figmaId": "1:3",
+     "figmaType": "COMPONENT",
+     "variantCount": 1
+    },
+    "ListItem": {
+     "figmaId": "1:4",
+     "figmaType": "COMPONENT",
+     "variantCount": 1
+    }
+   }
   },
-  "storybookOnly": {}, "figmaOnly": {}, "keyVariableIds": {}
+  "Feedback & Status": {
+   "sectionFrameId": "2:1",
+   "components": {
+    "Toast": {
+     "figmaId": "2:2",
+     "figmaType": "COMPONENT_SET",
+     "variantCount": 4
+    },
+    "Notice": {
+     "figmaId": "2:3",
+     "figmaType": "COMPONENT_SET",
+     "variantCount": 2,
+     "sourceFile": "src/components/Notice/Notice.tsx"
+    },
+    "Ghost": {
+     "figmaId": "2:4",
+     "figmaType": "COMPONENT",
+     "variantCount": 1,
+     "sourceFile": "src/components/Ghost/Ghost.tsx"
+    }
+   }
+  },
+  "Utility": {
+   "sectionFrameId": "3:1",
+   "components": {
+    "Icon": {
+     "figmaId": "3:2",
+     "figmaType": "COMPONENT",
+     "variantCount": 1
+    },
+    "Sheet": {
+     "figmaId": "3:3",
+     "figmaType": "COMPONENT",
+     "variantCount": 1
+    }
+   }
+  }
+ },
+ "storybookOnly": {},
+ "figmaOnly": {},
+ "keyVariableIds": {}
 }

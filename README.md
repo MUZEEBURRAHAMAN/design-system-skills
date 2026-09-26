@@ -258,7 +258,7 @@ Default is `localhost:6006`. If your Storybook runs on a different port, update 
 | [Figma Desktop](https://www.figma.com/downloads/)                | Figma skills                              | Download from Figma                              |
 | [Storybook](https://storybook.js.org/)                           | All skills                                | Part of your project                             |
 | [Figma Code Connect](https://github.com/figma/code-connect)      | Optional: richer MCP context              | `npm install --save-dev @figma/code-connect`     |
-| [design.md CLI](https://github.com/google-labs-code/design.md)   | Optional: lint, diff, export for `--spec` | `npm install --save-dev design.md`               |
+| [design.md CLI](https://github.com/google-labs-code/design.md)   | Optional: lint, diff, export for `--spec` | `npm install --save-dev @google/design.md`               |
 
 ---
 

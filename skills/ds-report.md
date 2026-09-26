@@ -154,7 +154,7 @@ Create a unified matrix with one row per component. Columns:
 **Status rules:**
 - **FULL PARITY** — present in all three (code, story, Figma)
 - **PARTIAL** — present in two of three
-- **CODE ONLY** — exported from DS barrel but no story AND no Figma component. Worth a second look under a Figma-first policy: was this ever designed?
+- **CODE ONLY** — exported from DS barrel but no story AND no Figma component. Registry entries with `partOf` are compound parts of a Figma component and are reported under their parent, never as CODE ONLY. Worth a second look under a Figma-first policy: was this ever designed?
 - **FIGMA ONLY** — exists in Figma but not exported from code. A real, actionable gap — not a footnote — corresponds to `presence.inCode: false` in the registry (see `guides/ds-registry.md`)
 - **STORY ONLY** — has a story file but not exported from DS barrel
 
