@@ -2,6 +2,8 @@
 
 Run design system skills as automated checks in CI pipelines. Use them to enforce drift thresholds, block new accessibility regressions, and track adoption — without requiring Figma Desktop or a Storybook GUI.
 
+**Figma stays the reference in CI.** CI runners can't run Figma Desktop, so the every-PR gate compares your code against a **committed Figma snapshot** — `.claude/ds-registry.json`, `.claude/ds-token-map.json`, and `DESIGN.md`, all regenerated *from live Figma* (`/ds-tokens --generate`, `pnpm ds:registry`, `/ds-design-md`) by whoever changes the Figma file, on a machine that has Figma Desktop. A PR that drifts from the snapshot fails; a Figma change is never "fixed" by editing code to match a stale snapshot — refresh the snapshot first. See [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md).
+
 ---
 
 ## What Can Run in CI
@@ -10,8 +12,8 @@ Run design system skills as automated checks in CI pipelines. Use them to enforc
 |-------|:---:|:---:|:---:|
 | `/ds-wcag` (static analysis only) | ✅ | No | No |
 | `/ds-wcag` (rendered + axe-core) | ✅ | No | Yes (headless) |
-| `/ds-report` (code + Storybook only) | ✅ | No | Yes (headless) |
-| `/ds-report` (full, including Figma) | ❌ | Yes (Desktop) | Yes |
+| `/ds-report --snapshot` (code + Storybook vs. the committed Figma snapshot) | ✅ | No (reads the snapshot) | Yes (headless) |
+| `/ds-report` (live Figma read) | ❌ | Yes (Desktop) | Yes |
 | `/ds-usage` | ✅ | No | No |
 | `/ds-tokens` (CSS side only) | ✅ | No | No |
 | `/ds-lifecycle audit` | ✅ | No | No |
@@ -145,10 +147,10 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Run DS report (code + Storybook, no Figma)
+      - name: Run DS report (code + Storybook vs. the committed Figma snapshot)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: claude --print "/ds-report --no-figma" > .claude/ds-report.md
+        run: claude --print "/ds-report --snapshot" > .claude/ds-report.md
 
       - name: Enforce drift threshold
         run: |
@@ -287,7 +289,7 @@ print("PASS")
 
 ## Scheduled Full Audits
 
-Run full audits (including Figma sync) on a schedule rather than on every PR. These require a machine with Figma Desktop, so they typically run on a dedicated Mac runner or via a local trigger.
+Run a live-Figma audit on a schedule as a **freshness check on the snapshot itself**: it catches the case where Figma changed but nobody refreshed the committed snapshot, so every-PR gates are quietly comparing against stale design data. These need Figma Desktop, so they run on a dedicated Mac runner or via a local trigger. If you don't have one, refresh the snapshot by hand whenever the Figma file changes — that's a required step of changing Figma, not an optional extra.
 
 ```yaml
 # .github/workflows/ds-full-audit.yml
@@ -350,8 +352,8 @@ Post a summary of DS health as a PR comment using the GitHub API:
 |------|-------------|----------------|
 | WCAG static analysis | Every PR touching DS components | Any new P0 issue |
 | WCAG rendered (axe-core) | Every PR touching DS components | New critical/serious violation |
-| Drift score | Every PR touching DS source | Drift > 5% (adjust per team) |
+| Drift vs. Figma snapshot (`/ds-report --snapshot`) | Every PR touching DS source | Drift > 5% (adjust per team) |
 | Shadow copy check | Every PR touching app code | New local re-implementation |
 | Lifecycle audit | Every PR | New import of deprecated component |
 | Token validation | Weekly or on token file changes | Parity score drops below 90% |
-| Full Figma sync report | Weekly scheduled | Drift increase > 3% from last week |
+| Live-Figma report + snapshot freshness | Weekly scheduled, and on any Figma change | Snapshot older than the Figma file, or drift increase > 3% from last week |

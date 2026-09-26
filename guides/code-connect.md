@@ -8,7 +8,7 @@ Optional. All skills work without it and improve with it.
 
 ## What Code Connect Does
 
-The Figma MCP server sees a component named "Button" and infers what props it takes from node names. That inference is often wrong. Code Connect replaces the inference with your actual API: the import path, prop names and types, value mappings (Figma's `Type = Primary` maps to `variant="primary"`), and a working code example.
+Figma's component — its variants, properties, and values — is the canonical definition of what a "Button" is (see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md)). Code Connect records how your implementation *maps onto* that definition: the import path, prop names and types, value mappings (Figma's `Type = Primary` maps to `variant="primary"`), and a working code example. It publishes implementation status against Figma; it does not correct or redefine the Figma component. If a mapping can't be written because the code lacks a Figma variant, that's implementation drift to fix in code, not a reason to change the Figma property.
 
 `/ds-sync` compares against real prop mappings. `/ds-proto` composes with your actual API. `/ds-report` can verify Figma variant properties against code props.
 
@@ -199,7 +199,7 @@ jobs:
 
 | Skill | Without Code Connect | With Code Connect |
 |-------|---------------------|-------------------|
-| `/ds-sync` | Compares visuals and token bindings | Also verifies Figma variant properties match code props via published mappings |
+| `/ds-sync` | Compares visuals and token bindings | Also verifies code props cover every Figma variant property, via published mappings; gaps are reported as code drift |
 | `/ds-proto` | Composes from manifest and source code | MCP server provides real component API and examples, reducing hallucinated props |
 | `/ds-report` | Counts components and variants | Can cross-reference Code Connect publication status as a fourth parity dimension |
 | `/ds-audit-figma` | Visual spot-check | Can verify Code Connect coverage alongside visual parity |

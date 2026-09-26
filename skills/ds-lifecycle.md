@@ -76,7 +76,7 @@ If the file exists, load it:
 }
 ```
 
-If the file is absent, generate it from the registry/manifest with all components set to `stage: "stable"` (safest default) and prompt the user to review.
+If the file is absent, generate it from the registry/manifest with all built components set to `stage: "stable"` (safest default) and prompt the user to review. Any registry component with `presence.inCode: false` (designed in Figma, not built yet) is seeded at `stage: "proposed"` instead — Figma-first means a designed component is a real, tracked entity before its first line of code.
 
 ### 1.2 Cross-Reference with Registry
 

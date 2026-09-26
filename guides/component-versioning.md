@@ -23,6 +23,7 @@ Design system components follow **semantic versioning** at the package level, wi
 | Renaming a CSS class | ✅ Yes | If consumers rely on class names |
 | Changing a token name | ✅ Yes | Consumers applying tokens break |
 | Visual/spacing changes | ⚠️ Sometimes | Breaking if consumers rely on pixel dimensions |
+| Renaming/removing a **Figma** variant or property | ✅ Yes | Figma is the source of truth, so a Figma-side change to a component's variants/properties is a breaking change for the code that implements it — version and migrate it the same way |
 | Accessibility improvements | ❌ No | Safe, but document for QA |
 | Performance refactors | ❌ No | Safe if API is unchanged |
 
@@ -211,7 +212,7 @@ Keep the `changelog` array in sync with `CHANGELOG.md` at the package level.
 | Individual files | `@deprecated` JSDoc + runtime warning | When prop is deprecated |
 | CI pipelines | Lifecycle gate fails on deprecated usage | On every PR |
 | Documentation | `guides/migrations/vN.md` | Alongside the release |
-| Figma | Figma component description updated | When stable or deprecated |
+| Figma | A note on the component (by a designer) linking the release, or Code Connect status | When stable or deprecated — this records the code release next to the design; it never changes the design |
 
 ---
 
@@ -223,4 +224,5 @@ Keep the `changelog` array in sync with `CHANGELOG.md` at the package level.
 - [ ] Consuming teams notified (2-week minimum notice for breaking changes)
 - [ ] Deprecated props have been live for at least one minor version with runtime warnings
 - [ ] ds-lifecycle entry updated (stage: stable, promotedAt recorded)
-- [ ] Figma component description updated
+- [ ] Designers told (Figma owners record the release next to the component themselves)
+- [ ] If a Figma variant/property was renamed or removed, that's a breaking change for code too — versioned, codemodded, and migrated like any other

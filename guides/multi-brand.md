@@ -58,7 +58,7 @@ Components reference only semantic tokens. Switching brands is a single attribut
 
 ### Figma: One File Per Brand
 
-Each brand has its own Figma file with:
+Each brand has its own Figma file — authored independently by designers, and the source of truth for that brand. Code conforms to it; nothing here generates the Figma file from code. Each file has:
 - Its own variable collection (same semantic names, different resolved values)
 - The shared component library published from the main DS file
 - Brand-specific styles applied via variable overrides (not separate components)
