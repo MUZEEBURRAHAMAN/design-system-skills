@@ -1,10 +1,10 @@
 ---
-description: Sync Storybook components to Figma via visual benchmarking, token mapping, and write-back
+description: Pull your Figma Design System into Storybook via visual benchmarking and token mapping, and propose code-side corrections — never writes to Figma
 ---
 
 # Design System Sync
 
-Synchronise your live Storybook component library with a Figma Design System file. The workflow renders each component, compares it to its Figma counterpart, extracts token/prop context, and writes adjustments back to Figma using only bound variables — never raw hex values.
+Bring your live Storybook component library into alignment with your Figma Design System file. The workflow renders each component, compares it to its Figma counterpart, extracts token/prop context, and proposes corrections to your CSS token files and component source. Figma is the source of truth here — see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) — so this skill never writes to a Figma node, under any flag or condition.
 
 ## Prerequisites
 
@@ -50,7 +50,7 @@ If the registry does not exist, fall back to the individual file reads described
 
 ### 1.1.1 Mapping File Staleness Check
 
-Before syncing, validate the mapping file is current. This prevents silent failures where write-backs target the wrong or deleted Figma nodes.
+Before syncing, validate the mapping file is current. This prevents silent failures where a comparison reads the wrong or already-deleted Figma node and reports false drift, or where a proposed code fix gets attributed to the wrong component entirely.
 
 **Step 1 — Resolve all component node IDs in Figma:**
 
@@ -97,7 +97,7 @@ For each `stories[]` entry in the mapping, verify the story ID exists in the Sto
 ```
 
 - If stale/missing/orphan entries are **0** → proceed with sync.
-- If any stale IDs exist → **pause and report.** Do NOT write to stale node IDs. Offer to attempt auto-recovery (re-scan Figma by name and update the IDs) before continuing.
+- If any stale IDs exist → **pause and report.** Do NOT read or compare against a stale node ID — the component it once pointed to may no longer exist, or a different node may now hold that ID. Offer to attempt auto-recovery (re-scan Figma by name and update the IDs) before continuing.
 - If > 25% of entries are invalid → **abort sync** and instruct the user to regenerate the mapping file using the [Mapping File Guide](../guides/mapping-file.md).
 
 **Auto-recovery for stale IDs:** For each stale component, search Figma by name:
@@ -188,13 +188,13 @@ Before visual comparison, run a programmatic scan across ALL section frames to f
 
 Output a categorised table per section.
 
-### 2.0.1 Variable Correctness Audit (Wrong Bindings)
+### 2.0.1 Variable Correctness Audit (Wrong Code Token)
 
-Beyond checking for missing bindings, verify that bound variables are the **correct** ones by cross-referencing against the code's CSS tokens:
+Beyond checking that Figma nodes have *a* variable binding, verify code is using the **matching** CSS token for that same role:
 
-1. Extract the bound variable name from each Figma node
-2. Extract the expected CSS token from the component source code for that state/variant
-3. If the bound variable ≠ the expected token, flag as `WRONG_BINDING`
+1. Extract the bound variable name from each Figma node — this is the correct answer
+2. Extract the CSS token the component source actually applies for that state/variant
+3. If code's token ≠ Figma's bound variable, flag as `WRONG_TOKEN` — the fix targets the component's source (Phase 4.2), never Figma's binding
 
 ### 2.0.2 Component Dimension Comparison
 
@@ -273,41 +273,37 @@ Compare Storybook tokens against Figma bindings. For each discrepancy, record:
 
 ---
 
-## Phase 4: Write-Back to Figma
+## Phase 4: Propose Code Updates
 
-### 4.1 Binding Corrections
+Figma is correct. A DRIFT or MISMATCH means the *implementation* has drifted — every fix in this phase targets a CSS token file or a component source file. This skill never writes to a Figma node, under any flag or condition (Guardrail 1, SOURCE-OF-TRUTH.md).
 
-For each DRIFT or MISSING token:
+### 4.1 Token Corrections (may be applied directly)
 
-1. Look up the correct Figma Variable ID from the token translation map
-2. Use `figma_execute` to set the variable binding:
-   ```js
-   const node = await figma.getNodeByIdAsync('NODE_ID');
-   const variable = await figma.variables.getVariableByIdAsync('VAR_ID');
-   node.setBoundVariable('fills', 0, variable);
+For each DRIFT or MISSING token, the fix is narrow and traceable — a single CSS custom property's value should equal Figma's resolved value for that variable. This is safe to apply directly (Edit the token file):
+
+1. Look up the correct resolved value from Figma via the token translation map (already read in Phase 3.2 — never invent a value from a screenshot; Guardrail 4)
+2. Edit the CSS custom property in the token file (e.g., `src/styles/tokens.css` or `src/styles/colors.css`) to match:
+   ```css
+   /* was: --stroke-input: #e2e2e2; */
+   --stroke-input: #d9dce1; /* now matches Figma variable stroke-input */
    ```
-3. **NEVER set raw hex values.** Always bind to variables.
+3. Record every change in the report (Phase 5) — never a silent edit.
 
-### 4.2 Spacing & Dimension Fixes
+### 4.2 Spacing, Dimension & Structural Fixes (proposal only — never auto-applied)
 
-If spacing values differ:
+A padding/gap/radius/structural difference usually means a component's source needs a real code change (a Tailwind class, a CSS module value, a missing rendered element), not just a token swap. Under Guardrail 5, this is always a **proposal**, never an automatic edit:
 
-1. Read the expected values from Storybook
-2. Set padding, gap, and corner radius on the Figma node:
-   ```js
-   node.paddingTop = 8;
-   node.paddingBottom = 8;
-   node.itemSpacing = 12;
-   node.cornerRadius = 8;
-   ```
+1. Read the expected values from Figma (padding, gap, corner radius, missing child elements found in Phase 2.0.3)
+2. Write a proposed patch into the report (Phase 5) showing the current code, the Figma-derived target value, and the specific line/class to change
+3. Only apply it to the source file if the person running this skill explicitly confirms the specific change
 
 ### 4.3 Review & Confirm
 
-After all write-backs:
+After Phase 4.1's direct token edits:
 
-1. Re-capture the Figma component screenshot
-2. Compare against Storybook to verify the fix
-3. Report the result
+1. Re-render the affected Storybook stories
+2. Re-extract computed CSS and compare against the same Figma values used in 4.1 to verify the fix actually landed
+3. Report the result, alongside every unapplied proposal from 4.2
 
 ---
 
@@ -316,27 +312,27 @@ After all write-backs:
 ### 5.1 Per-Component Summary
 
 ```markdown
-| Component | Light | Dark | Issues Fixed | Remaining |
-|-----------|-------|------|-------------|-----------|
-| Button    | MATCH | MATCH| 0           | 0         |
-| Input     | DRIFT | DRIFT| 3 bindings  | 1 manual  |
-| Badge     | MISMATCH | — | —           | Needs rebuild |
+| Component | Light | Dark | Tokens Fixed | Proposed (needs confirmation) |
+|-----------|-------|------|--------------|-------------------------------|
+| Button    | MATCH | MATCH| 0            | 0                              |
+| Input     | DRIFT | DRIFT| 3 tokens     | 1 structural fix (Phase 4.2)   |
+| Badge     | MISMATCH | — | —            | Needs manual rebuild            |
 ```
 
 ### 5.2 Token Coverage
 
 ```markdown
-| Metric              | Count | Status |
-|---------------------|-------|--------|
-| Total fills audited | 240   | —      |
-| Variable-bound      | 228   | 95%    |
-| Fixed this run      | 8     | +3.3%  |
-| Still hardcoded     | 4     | Review |
+| Metric                    | Count | Status |
+|----------------------------|-------|--------|
+| Total properties audited   | 240   | —      |
+| Correctly token-bound      | 228   | 95%    |
+| Fixed in code this run     | 8     | +3.3%  |
+| Still hardcoded in code    | 4     | Review |
 ```
 
 ### 5.3 Action Items
 
-List remaining issues that need manual intervention, grouped by severity.
+List every Phase 4.2 proposal that still needs someone to confirm and apply it, plus anything flagged MISMATCH that needs manual rebuild, grouped by severity.
 
 ---
 
@@ -379,11 +375,12 @@ This is slow but catches every discrepancy at the variant level.
 
 ## Key Rules
 
-1. **Variables only** — Every color write to Figma MUST use variable bindings, never raw hex
-2. **Token map drives decisions** — The CSS↔Figma token map is the source of truth for what "correct" looks like
-3. **Code is canonical** — When Storybook and Figma disagree, Storybook (code) wins
-4. **Log everything** — Every change is recorded for the report
-5. **No destructive changes** — Components are updated, never deleted
+1. **Never write to Figma** — no flag, mode, or precision level in this skill writes to a Figma node. Read access (`figma_execute`, `figma_get_variables`, `figma_capture_screenshot`) is unrestricted; write access isn't part of this skill's job.
+2. **Figma is canonical** — when Storybook/code and Figma disagree, Figma is correct. The finding is "the implementation has drifted," never "the design file is stale."
+3. **Token corrections may be applied directly** (Phase 4.1) — narrow, single-property, always traced to a real Figma variable value. **Structural/spacing fixes are proposals only** (Phase 4.2) — always confirmed by a person before touching a component's source.
+4. **Never invent a value** — a proposed or applied fix always traces to a resolved Figma variable/style value, never a number guessed from a screenshot diff (Guardrail 4).
+5. **Log everything** — every change, applied or proposed, is recorded in the report.
+6. **No destructive changes** — components are updated, never deleted, on either side.
 
 ## Usage
 
