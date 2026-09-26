@@ -1,26 +1,26 @@
 ---
-description: Generate a DESIGN.md file from your design system tokens, components, and Figma variables
+description: Generate a DESIGN.md file from your Figma variables and typography styles, cross-referenced with code
 ---
 
 # DESIGN.md Generator
 
-Generate a `DESIGN.md` file from your existing design system data — tokens, Figma variables, typography, spacing, component patterns, and design guidelines. The output is a portable, AI-readable file that any agent (Claude Code, Cursor, Lovable, v0, Google Stitch) can consume to generate UI that stays on-brand without additional prompting.
+Generate a `DESIGN.md` file from your existing design system data — Figma variables and typography styles first, cross-referenced against code tokens and component patterns, plus design guidelines. The output is a portable, AI-readable file that any agent (Claude Code, Cursor, Lovable, v0, Google Stitch) can consume to generate UI that stays on-brand without additional prompting. Figma is attempted by default — see [SOURCE-OF-TRUTH.md](../SOURCE-OF-TRUTH.md) — because a DESIGN.md built only from code can silently encode drift that's already crept into the CSS.
 
 ## Prerequisites
 
+- Figma Desktop Bridge running (default source for variable values and typography styles — see `--no-figma` below if this genuinely isn't available)
 - `.claude/ds-registry.json` — unified component registry (optional, enables fast path)
-- `.claude/ds-token-map.json` — CSS token ↔ Figma variable cross-reference
+- `.claude/ds-token-map.json` — CSS token ↔ Figma variable cross-reference (optional; used to cross-check code against the live Figma read)
 - CSS token files (e.g., `src/styles/tokens.css`, `src/styles/colors.css`)
-- **For richer output:** Figma Desktop Bridge running (reads resolved variable values and typography styles)
 
 ## Arguments
 
 - `$ARGUMENTS` — optional flags:
-  - `--figma` — pull typography styles and variable values directly from Figma (richer output)
+  - `--no-figma` — skip the live Figma read and generate from code sources only. This is a **degraded fallback**, not the normal path — the output is labelled as code-only so nobody mistakes it for a Figma-verified DESIGN.md
   - `--update` — update an existing DESIGN.md, preserving manually written sections
   - `--root` — write to project root `DESIGN.md` instead of `.claude/DESIGN.md` (default)
   - `--spec` — output a [google-labs-code/design.md](https://github.com/google-labs-code/design.md) compliant file: YAML front matter with machine-readable tokens + markdown body in the canonical section order. Compatible with `design.md lint`, `design.md diff`, and `design.md export`.
-  - (empty) — generate `.claude/DESIGN.md` from code sources only
+  - (empty) — generate `.claude/DESIGN.md`, reading live Figma variables and text styles by default
 
 ---
 
@@ -30,17 +30,7 @@ Generate a `DESIGN.md` file from your existing design system data — tokens, Fi
 
 If `.claude/ds-registry.json` exists, load it. The registry provides component names, variants, props, tokens, and section groupings in one read.
 
-### 1.2 Load Token Map
-
-Read `.claude/ds-token-map.json`. This provides the full CSS ↔ Figma variable cross-reference with resolved hex values for both light and dark modes.
-
-If the token map doesn't exist, read CSS token files directly:
-- `src/styles/tokens.css` — primitive tokens
-- `src/styles/colors.css` — semantic color tokens
-- `src/styles/index.css` — root theme overrides
-- Any file containing `:root {` or `.dark {` blocks with CSS custom properties
-
-### 1.3 Load Figma Variables (`--figma` flag)
+### 1.2 Load Figma Variables (default — skip only if `--no-figma`)
 
 ```js
 // figma_execute
@@ -59,16 +49,21 @@ return collections.map(col => ({
 }));
 ```
 
+This is the primary source for the Color Palette section (Phase 2). If the Figma Desktop Bridge isn't reachable and `--no-figma` wasn't passed, stop and tell the user Figma isn't available rather than silently falling back — they can re-run with `--no-figma` if a degraded, code-only file is genuinely what they want.
+
+### 1.3 Load Token Map (cross-check, not a substitute)
+
+Read `.claude/ds-token-map.json` if it exists. This provides the CSS ↔ Figma variable cross-reference — use it to catch any CSS token whose value doesn't match what Phase 1.2 just read live from Figma, and prefer the live Figma value in the generated file.
+
+If neither the token map nor a live Figma read is available (`--no-figma`, or Figma genuinely isn't accessible and the user confirmed they want the degraded fallback), read CSS token files directly:
+- `src/styles/tokens.css` — primitive tokens
+- `src/styles/colors.css` — semantic color tokens
+- `src/styles/index.css` — root theme overrides
+- Any file containing `:root {` or `.dark {` blocks with CSS custom properties
+
 ### 1.4 Load Typography
 
-Read CSS for font declarations:
-```css
-/* Look for patterns like: */
---font-sans: "Inter", system-ui, sans-serif;
---font-mono: "JetBrains Mono", monospace;
-```
-
-If `--figma` flag is set, also pull text styles:
+Pull text styles from Figma by default:
 ```js
 // figma_execute
 return figma.getLocalTextStyles().map(s => ({
@@ -81,6 +76,13 @@ return figma.getLocalTextStyles().map(s => ({
 }));
 ```
 
+Only under `--no-figma`, fall back to reading CSS for font declarations instead:
+```css
+/* Look for patterns like: */
+--font-sans: "Inter", system-ui, sans-serif;
+--font-mono: "JetBrains Mono", monospace;
+```
+
 ### 1.5 Load Existing Design Context
 
 Check for `.claude/proto-decisions.md` — extract any established design principles, rejected defaults, or layout decisions recorded during prior prototyping sessions. These become the "Design Guidelines" section.
@@ -91,7 +93,7 @@ Check for an existing `DESIGN.md` or `.claude/DESIGN.md` (relevant for `--update
 
 ## Phase 2: Extract Color Palette
 
-From the token map and CSS sources, build a structured color palette.
+From the Figma variables read in Phase 1.2 (or the token map/CSS sources under `--no-figma`), build a structured color palette.
 
 ### 2.1 Primitive Colors
 
@@ -132,14 +134,14 @@ For each semantic token, trace alias chains to primitive hex values. For light/d
 
 ### 3.1 Font Families
 
-Identify font families from CSS `--font-*` tokens or Figma text styles:
+Identify font families from Figma text styles (default) or CSS `--font-*` tokens (`--no-figma`):
 - Primary (sans-serif) — used for body and UI text
 - Display — used for headings (if different)
 - Mono — used for code
 
 ### 3.2 Type Scale
 
-From Figma text styles or CSS `text-*` / `text-size-*` tokens, extract the full scale:
+From Figma text styles (default) or CSS `text-*` / `text-size-*` tokens (`--no-figma`), extract the full scale:
 
 | Name | Size | Weight | Line Height | Usage |
 |------|------|--------|-------------|-------|
@@ -202,7 +204,7 @@ Map to semantic usage:
 
 ## Phase 7: Generate DESIGN.md
 
-Assemble all extracted data into the standard DESIGN.md format. The file is designed to be read by AI agents as persistent context — keep it scannable, specific, and free of filler.
+Assemble all extracted data into the standard DESIGN.md format. The file is designed to be read by AI agents as persistent context — keep it scannable, specific, and free of filler. If `--no-figma` was used, add a one-line notice right under the title: `> ⚠️ Generated with --no-figma: code sources only, not verified against Figma.` Omit it entirely when Figma was read successfully.
 
 ```markdown
 # DESIGN.md
@@ -457,16 +459,17 @@ npm install --save-dev design.md
 2. **Both themes** — every color entry includes light and dark resolved values
 3. **Agent-readable** — tables over prose, scannable structure, no filler text
 4. **Design intent lives here** — structural/API docs belong in specs; DESIGN.md captures mood, constraints, and rules
-5. **Token names are authoritative** — always include the CSS custom property name so agents can reference the live token
+5. **Figma-resolved values are authoritative** — when a live Figma read and the token map/CSS disagree, the file records Figma's value. Always include the CSS custom property name alongside it so agents can still reference the live token in code.
+6. **`--no-figma` output is labelled, not silent** — a code-only DESIGN.md must say so at the top of the file, so nobody mistakes it for a Figma-verified one
 
 ## Usage
 
 ```bash
-# Generate .claude/DESIGN.md from code sources
+# Generate .claude/DESIGN.md, reading live Figma variables and text styles by default
 /ds-design-md
 
-# Generate with richer Figma data (typography styles, variable values)
-/ds-design-md --figma
+# Degraded fallback: code sources only, clearly labelled as such (Figma unavailable)
+/ds-design-md --no-figma
 
 # Write to project root (for Cursor, Lovable, Google Stitch)
 /ds-design-md --root
@@ -474,12 +477,12 @@ npm install --save-dev design.md
 # Update existing DESIGN.md (preserves manual sections)
 /ds-design-md --update
 
-# Full generation with Figma data, written to project root
-/ds-design-md --figma --root
+# Full generation from Figma, written to project root
+/ds-design-md --root
 
 # Generate google-labs-code/design.md spec-compliant file (YAML front matter + canonical sections)
 /ds-design-md --spec --root
 
-# Spec-compliant with Figma data and lint validation
-/ds-design-md --spec --figma --root
+# Spec-compliant, degraded code-only fallback with lint validation
+/ds-design-md --spec --no-figma --root
 ```
