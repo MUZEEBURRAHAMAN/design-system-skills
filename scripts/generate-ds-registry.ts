@@ -1,9 +1,19 @@
 /**
- * Design System Registry Generator
+ * Design System Registry Generator (Figma-first)
  *
- * Reads source files (barrel exports, CVA variants, story metadata, Figma map,
- * token map) and produces a single `.claude/ds-registry.json` — the unified
- * source of truth for AI tooling.
+ * Enumerates components from the Figma mapping file FIRST — every component
+ * that exists in a Figma section gets a registry entry even if no code
+ * implementation exists yet (`presence.inCode: false`). Code (barrel exports,
+ * CVA variants, story metadata) is then read and merged in as a second pass.
+ * Figma is the source of truth for what the design system's component set
+ * *is*; code is what has been *built* of it so far. See ../SOURCE-OF-TRUTH.md.
+ *
+ * This script has no live Figma access of its own (it only reads whatever is
+ * already in `.claude/ds-story-figma-map.json` / `.claude/ds-token-map.json`).
+ * Populating those files with real Figma variant/property/token data is the
+ * job of the interactive skills (ds-sync, ds-tokens, ds-spec), which do have
+ * `figma_execute` access. This script's job is just to merge what's already
+ * there — never to guess or invent Figma-side data.
  *
  * Run:       pnpm ds:registry
  * Auto-sync: called by Storybook's `prestorybook` hook
@@ -321,8 +331,10 @@ interface FigmaMap {
     darkMode: string;
   };
   sections: Record<string, FigmaSection>;
-  storybookOnly: Record<string, string[]>;
-  figmaOnly: Record<string, string>;
+  /** Code exports with no visual Figma counterpart by design (hooks, utilities) — a permanent, documented exception, not a gap to fill. */
+  storybookOnly: Record<string, { reason: string }>;
+  /** Figma nodes with no code counterpart by design (documentation frames, color swatches) — a permanent, documented exception. A real component pending implementation belongs in `sections[x].components`, not here — see `presence.inCode` on the registry entry it produces. */
+  figmaOnly: Record<string, { figmaId?: string; reason: string }>;
   keyVariableIds: Record<string, string>;
 }
 
@@ -349,17 +361,25 @@ interface TokenMap {
 
 interface RegistryComponent {
   name: string;
-  package: string;
-  sourceFile: string;
   section: string;
+  /**
+   * Whether this component actually exists on each side. `inFigma: true,
+   * inCode: false` is a real component proposed in Figma with no
+   * implementation yet — a first-class entry, not a footnote. See Guardrail 6
+   * in ../SOURCE-OF-TRUTH.md.
+   */
+  presence: { inFigma: boolean; inCode: boolean };
+  package?: string;
+  sourceFile?: string;
   variants?: Record<string, string[]>;
   defaultVariants?: Record<string, string>;
   props?: Record<string, string>;
   tokens?: string[];
   radixPrimitives?: string[];
+  /** Storybook story IDs — from the mapping file when `presence.inCode` is false (a designer may have pre-listed intended story names), from the parsed story file otherwise. */
   stories?: {
-    file: string;
-    path: string;
+    file?: string;
+    path?: string;
     variants: string[];
     argTypes?: Record<string, { options?: string[] }>;
   };
@@ -403,9 +423,15 @@ interface Registry {
     remix: string[];
   };
   sections: string[];
+  /**
+   * Permanent, documented exceptions only (a hook with no visual form, a
+   * documentation-only Figma frame) — NOT where a real not-yet-built
+   * component lives. Those are first-class entries in `components` with
+   * `presence.inCode: false`. See SOURCE-OF-TRUTH.md Guardrail 6.
+   */
   outliers?: {
-    storybookOnly: Record<string, string[]>;
-    figmaOnly: Record<string, string>;
+    storybookOnly: Record<string, { reason: string }>;
+    figmaOnly: Record<string, { figmaId?: string; reason: string }>;
   };
 }
 
@@ -570,9 +596,47 @@ function buildRegistry(): Registry {
     }
   }
 
-  // Build components registry from barrel exports
   const components: Record<string, RegistryComponent> = {};
   const allSections = new Set<string>();
+
+  // ---------------------------------------------------------------------
+  // PASS 1 — seed from Figma. Every component Figma already knows about
+  // gets a registry entry now, whether or not code exists for it yet.
+  // This is the Figma-first fix: previously, a component sitting in
+  // figmaMap.sections[x].components with no matching barrel export was
+  // silently invisible in the registry. Now it's a real entry with
+  // `presence: { inFigma: true, inCode: false }`.
+  // ---------------------------------------------------------------------
+  for (const [name, figma] of figmaByComponent) {
+    allSections.add(figma.section);
+    const entry: RegistryComponent = {
+      name,
+      section: figma.section,
+      presence: { inFigma: true, inCode: false },
+      figma: {
+        nodeId: figma.entry.figmaId,
+        type: figma.entry.figmaType,
+      },
+    };
+    if (figma.entry.variantCount)
+      entry.figma!.variantCount = figma.entry.variantCount;
+    entry.figma!.sectionFrameId = figma.sectionFrameId;
+    // The mapping file may list intended story IDs before any code exists
+    // (a designer or PM pre-naming the stories a future implementation
+    // should produce). Surface them so the gap is actionable, not just known.
+    if (figma.entry.stories && figma.entry.stories.length > 0) {
+      entry.stories = { variants: figma.entry.stories };
+    }
+    components[name] = entry;
+  }
+
+  // ---------------------------------------------------------------------
+  // PASS 2 — merge in code. Fills in implementation details for entries
+  // Pass 1 already created, and adds any code-only component Figma has no
+  // section entry for yet (presence.inFigma: false — a real, separate
+  // signal worth surfacing: this was built without a Figma source).
+  // ---------------------------------------------------------------------
+  const codeClaimedNames = new Set<string>();
 
   for (const { resolvedPath, packageName, priority } of allExports) {
     const source = readFileSync(resolvedPath, "utf-8");
@@ -618,26 +682,34 @@ function buildRegistry(): Registry {
       if (name.endsWith("Icon") && !name.includes("Button")) continue;
       if (name.startsWith("Ri")) continue;
 
-      // Higher-priority packages win: skip if already registered by a higher-priority package
-      if (components[name]) continue;
+      // Higher-priority packages win: skip if a higher-priority package
+      // already claimed this name (independent of the Figma seed pass).
+      if (codeClaimedNames.has(name)) continue;
+      codeClaimedNames.add(name);
 
       // Find matching story
       const storyMeta =
         storyByComponent.get(name) ||
         storyByComponent.get(name.replace(/([A-Z])/g, " $1").trim());
 
-      // Find matching Figma entry
       const figma = figmaByComponent.get(name);
+      const existing = components[name]; // set in Pass 1 if Figma knows this component
 
-      const section = figma?.section || storyMeta?.section || "Uncategorized";
+      const section =
+        existing?.section ||
+        figma?.section ||
+        storyMeta?.section ||
+        "Uncategorized";
       allSections.add(section);
 
-      const entry: RegistryComponent = {
+      const entry: RegistryComponent = existing ?? {
         name,
-        package: packageName,
-        sourceFile: relPath,
         section,
+        presence: { inFigma: false, inCode: false },
       };
+      entry.presence.inCode = true;
+      entry.package = packageName;
+      entry.sourceFile = relPath;
 
       if (cvaVariants) entry.variants = cvaVariants;
       if (cvaDefaults) entry.defaultVariants = cvaDefaults;
@@ -646,6 +718,8 @@ function buildRegistry(): Registry {
       if (radix.length > 0) entry.radixPrimitives = radix;
 
       if (storyMeta) {
+        // Code-derived story data is more precise than the mapping file's
+        // pre-listed names (Pass 1) — replace, don't just fall back to it.
         entry.stories = {
           file: storyMeta.file,
           path: storyMeta.title,
@@ -654,16 +728,6 @@ function buildRegistry(): Registry {
         if (Object.keys(storyMeta.argTypes).length > 0) {
           entry.stories.argTypes = storyMeta.argTypes;
         }
-      }
-
-      if (figma) {
-        entry.figma = {
-          nodeId: figma.entry.figmaId,
-          type: figma.entry.figmaType,
-        };
-        if (figma.entry.variantCount)
-          entry.figma.variantCount = figma.entry.variantCount;
-        entry.figma.sectionFrameId = figma.sectionFrameId;
       }
 
       components[name] = entry;
@@ -763,11 +827,18 @@ const registry = buildRegistry();
 const json = JSON.stringify(registry, null, 2);
 writeFileSync(OUTPUT_PATH, `${json}\n`);
 
-const componentCount = Object.keys(registry.components).length;
+const allComponents = Object.values(registry.components);
+const componentCount = allComponents.length;
 const sectionCount = registry.sections.length;
 const tokenCount =
   (registry._meta.tokenStats?.primitives ?? 0) +
   (registry._meta.tokenStats?.semantic ?? 0);
+const notYetBuilt = allComponents.filter(
+  (c) => c.presence.inFigma && !c.presence.inCode,
+);
+const builtWithoutFigma = allComponents.filter(
+  (c) => c.presence.inCode && !c.presence.inFigma,
+);
 
 console.log(`ds-registry.json generated:`);
 console.log(`  ${componentCount} components across ${sectionCount} sections`);
@@ -775,4 +846,14 @@ console.log(`  ${tokenCount} tokens mapped`);
 console.log(
   `  ${registry.icons?.custom.length ?? 0} custom icons, ${registry.icons?.remix.length ?? 0} remix icons`,
 );
+if (notYetBuilt.length > 0) {
+  console.log(
+    `  ${notYetBuilt.length} in Figma, not yet built: ${notYetBuilt.map((c) => c.name).join(", ")}`,
+  );
+}
+if (builtWithoutFigma.length > 0) {
+  console.log(
+    `  ${builtWithoutFigma.length} built without a Figma source: ${builtWithoutFigma.map((c) => c.name).join(", ")}`,
+  );
+}
 console.log(`  Output: ${OUTPUT_PATH.replace(`${ROOT}/`, "")}`);
